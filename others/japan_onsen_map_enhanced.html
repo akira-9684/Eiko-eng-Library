@@ -1,0 +1,1009 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🛁 日本 温泉地マップ</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" onerror="this.onerror=null;this.href='https://unpkg.com/leaflet@1.9.4/dist/leaflet.css'"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script>if(!window.L){document.write('<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"><\/script>')}</script>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:'Helvetica Neue',Arial,'Hiragino Kaku Gothic ProN',sans-serif; height:100vh; display:flex; flex-direction:column; background:#1a0a00; }
+
+/* HEADER */
+header {
+  background: linear-gradient(135deg, #3a1505 0%, #6b2a0e 50%, #3a1505 100%);
+  color:#fff; padding:10px 16px; display:flex; align-items:center;
+  gap:12px; flex-wrap:wrap; box-shadow:0 2px 12px rgba(0,0,0,0.5);
+  border-bottom:2px solid #c45e1a;
+}
+header h1 { font-size:1.2rem; white-space:nowrap; letter-spacing:0.05em; }
+.region-filters { display:flex; gap:6px; flex-wrap:wrap; flex:1; }
+.region-btn {
+  padding:5px 11px; border:none; border-radius:20px; cursor:pointer;
+  font-size:0.75rem; font-weight:700; color:#fff;
+  opacity:0.75; transition:all 0.2s; white-space:nowrap;
+}
+.region-btn:hover, .region-btn.active { opacity:1; transform:scale(1.07); box-shadow:0 2px 8px rgba(0,0,0,0.4); }
+.region-btn.all-btn { background:#7a3c0a; }
+
+/* STAMP COUNTER */
+.stamp-counter {
+  display:flex; align-items:center; gap:10px; background:rgba(0,0,0,0.35);
+  border-radius:12px; padding:6px 12px; border:1px solid rgba(196,94,26,0.4);
+}
+.sc-block { display:flex; flex-direction:column; align-items:center; }
+.sc-num { font-size:1.3rem; font-weight:900; line-height:1; }
+.sc-visited { color:#f5a623; }
+.sc-remaining { color:#ff7043; }
+.sc-label { font-size:0.6rem; color:rgba(255,255,255,0.7); margin-top:2px; }
+.sc-divider { width:1px; height:32px; background:rgba(255,255,255,0.2); }
+.sc-bar-wrap { min-width:120px; }
+.sc-bar-bg { background:rgba(255,255,255,0.15); border-radius:6px; height:8px; overflow:hidden; margin-bottom:3px; }
+.sc-bar-fill { height:100%; background:linear-gradient(90deg,#f5a623,#ff7043); border-radius:6px; transition:width 0.4s ease; }
+.sc-bar-label { font-size:0.6rem; color:rgba(255,255,255,0.75); text-align:center; }
+
+/* MAP */
+#map { flex:1; z-index:1; }
+
+/* PANEL */
+#panel {
+  position:fixed; top:0; right:0; width:370px; height:100%;
+  background:#fff; z-index:1000; box-shadow:-4px 0 24px rgba(0,0,0,0.35);
+  transform:translateX(100%); transition:transform 0.3s ease;
+  display:flex; flex-direction:column; overflow:hidden;
+}
+#panel.open { transform:translateX(0); }
+.panel-photo { width:100%; height:200px; object-fit:cover; background:#f0e0d0; flex-shrink:0; }
+.panel-body { padding:16px; overflow-y:auto; flex:1; }
+.panel-name { font-size:1.3rem; font-weight:900; color:#3a1505; margin-bottom:4px; }
+.panel-region-badge {
+  display:inline-block; padding:2px 10px; border-radius:10px;
+  font-size:0.72rem; color:#fff; font-weight:700; margin-bottom:10px;
+}
+.panel-desc { font-size:0.88rem; color:#444; line-height:1.65; margin-bottom:12px; }
+.panel-detail-row {
+  display:flex; gap:8px; margin-bottom:8px;
+  font-size:0.83rem; align-items:flex-start;
+}
+.panel-detail-row .icon { font-size:1rem; flex-shrink:0; width:22px; }
+.panel-detail-row .label { color:#7a3c0a; font-weight:700; min-width:52px; flex-shrink:0; }
+.panel-detail-row .value { color:#333; line-height:1.5; }
+.panel-url { margin-top:12px; }
+.panel-url a {
+  display:inline-flex; align-items:center; gap:6px;
+  background:#c45e1a; color:#fff; padding:8px 16px; border-radius:6px;
+  text-decoration:none; font-size:0.82rem; font-weight:700; transition:background 0.2s;
+}
+.panel-url a:hover { background:#a34b15; }
+.visit-btn {
+  display:flex; align-items:center; gap:8px; margin-top:14px; padding:10px 18px;
+  border-radius:8px; border:2px solid #c45e1a; background:#fff;
+  cursor:pointer; font-size:0.9rem; font-weight:700; color:#c45e1a;
+  transition:all 0.2s; width:100%;
+}
+.visit-btn:hover { background:#fff5ee; }
+.visit-btn.visited { background:#c45e1a; color:#fff; }
+.visit-btn.visited:hover { background:#a34b15; }
+.close-btn {
+  position:absolute; top:10px; right:10px; width:32px; height:32px;
+  border-radius:50%; background:rgba(0,0,0,0.55); color:#fff;
+  border:none; cursor:pointer; font-size:1.1rem; display:flex;
+  align-items:center; justify-content:center; z-index:10;
+}
+.close-btn:hover { background:rgba(0,0,0,0.75); }
+
+/* MARKERS */
+.custom-marker {
+  width:28px; height:28px; border-radius:50% 50% 50% 0;
+  transform:rotate(-45deg); border:2px solid rgba(255,255,255,0.85);
+  box-shadow:0 2px 6px rgba(0,0,0,0.4); position:relative;
+  cursor:pointer; transition:transform 0.15s;
+}
+.custom-marker.visited { opacity:0.85; }
+.custom-marker.visited::after {
+  content:'✓'; position:absolute; top:50%; left:50%;
+  transform:translate(-50%,-50%) rotate(45deg);
+  color:#fff; font-size:13px; font-weight:900;
+  text-shadow:0 1px 2px rgba(0,0,0,0.5); line-height:1;
+}
+</style>
+<style>
+:root{--brown:#3a1505;--accent:#c45e1a;--paper:#fff;--line:#e2d6ce;--shadow:0 12px 36px rgba(45,20,8,.2)}
+html{width:100%;height:100%;overflow:hidden}body{width:100%;height:100%;height:100dvh;min-height:100%;overflow:hidden}header{flex:0 0 auto;position:relative;z-index:900}#map{display:block;position:relative;width:100%;height:auto;min-height:240px;flex:1 1 0!important;overflow:hidden}.leaflet-container{width:100%!important;height:100%!important;background:#dce8e2}
+button,input,select,textarea{font:inherit}button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:3px solid #ffd166;outline-offset:2px}
+.top-actions{display:flex;gap:6px;align-items:center}.icon-btn{border:1px solid #ffffff44;background:#ffffff12;color:#fff;border-radius:9px;padding:7px 10px;cursor:pointer;white-space:nowrap}.icon-btn:hover{background:#ffffff26}
+.search-tools{position:fixed;z-index:800;top:76px;left:50px;right:12px;display:flex;gap:8px;align-items:flex-start;pointer-events:none}.search-box,.filter-toggle,.view-toggle{pointer-events:auto;background:#fff;border:1px solid var(--line);border-radius:12px;box-shadow:0 4px 14px #0002}.search-box{width:min(430px,45vw);display:flex;overflow:hidden}.search-box input{width:100%;border:0;padding:11px 12px;outline:none}.search-box button,.filter-toggle,.view-toggle{border:0;background:#fff;cursor:pointer;padding:11px 13px}.filter-toggle.active{color:var(--accent);font-weight:700}
+.advanced-filters{pointer-events:auto;display:none;width:330px;background:#fff;border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);padding:14px}.advanced-filters.open{display:block}.filter-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px}.field{display:flex;flex-direction:column;gap:4px;font-size:12px;color:#666}.field select,.field input,.field textarea{border:1px solid #ccc;border-radius:8px;padding:8px;background:white;color:#222}.check-row{display:flex;gap:12px;flex-wrap:wrap;margin-top:10px;font-size:12px}.result-count{margin-top:10px;font-size:12px;color:#555;display:flex;justify-content:space-between}
+.list-panel{position:fixed;z-index:750;top:0;right:0;bottom:0;width:400px;background:#f8f3ef;box-shadow:var(--shadow);display:none;flex-direction:column}.list-panel.open{display:flex}.list-head{padding:84px 14px 10px;display:flex;justify-content:space-between;align-items:center}.spot-list{overflow:auto;padding:0 12px 18px;display:grid;gap:10px}.spot-card{border:1px solid var(--line);background:#fff;border-radius:12px;padding:12px;display:grid;grid-template-columns:1fr auto;gap:7px;cursor:pointer;text-align:left}.spot-card:hover{border-color:#d08a5b;transform:translateY(-1px)}.spot-card h3{font-size:15px;color:var(--brown)}.spot-card p{grid-column:1/-1;color:#666;font-size:12px;line-height:1.45}.mini-tags{display:flex;gap:4px;flex-wrap:wrap;grid-column:1/-1}.tag{padding:2px 7px;border-radius:999px;background:#fff0e7;color:#914013;font-size:10px}.fav{color:#d1495b;font-size:18px}
+.drawer{position:fixed;z-index:2000;top:0;right:0;width:min(460px,100%);height:100%;background:#fff;box-shadow:var(--shadow);transform:translateX(105%);transition:.25s;display:flex;flex-direction:column}.drawer.open{transform:none}.drawer-head{padding:16px;color:#fff;background:var(--brown);display:flex;justify-content:space-between;align-items:center}.drawer-body{padding:16px;overflow:auto;flex:1}.drawer-close{border:0;background:transparent;color:#fff;font-size:22px;cursor:pointer}.tabs{display:flex;gap:6px;margin-bottom:14px}.tab-btn{border:1px solid var(--line);background:#fff;border-radius:8px;padding:8px 10px;cursor:pointer}.tab-btn.active{background:var(--brown);color:#fff}.saved-item,.plan-item{padding:10px;border:1px solid var(--line);border-radius:10px;margin-bottom:8px;display:flex;gap:8px;justify-content:space-between;align-items:center}.plan-day{margin:14px 0 6px;font-weight:700;color:var(--brown)}
+.action-row{display:flex;flex-wrap:wrap;gap:7px;margin-top:12px}.action-btn{border:1px solid #d3b9a8;background:#fff;color:#713415;border-radius:9px;padding:9px 11px;cursor:pointer;text-decoration:none;font-size:12px}.action-btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}.action-btn.danger{color:#a72d3d}.panel-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}.panel-actions button{border:1px solid #dec4b3;background:#fff8f3;border-radius:9px;padding:9px;cursor:pointer}.live-card{background:#fff7f1;border:1px solid #ead3c3;border-radius:10px;padding:11px;margin-top:12px;font-size:12px;line-height:1.65}.live-grid{display:grid;grid-template-columns:1fr 1fr;gap:4px 12px}.notice{background:#fff7df;border-left:3px solid #e2a92c;padding:8px;margin-top:8px}.note-area{width:100%;min-height:75px;border:1px solid #ccc;border-radius:9px;padding:8px;margin-top:8px;resize:vertical}.photo-fallback{display:none;width:100%;height:200px;place-items:center;background:linear-gradient(135deg,#f6dfcf,#dca276);font-size:54px}.toast{position:fixed;z-index:3000;left:50%;bottom:24px;transform:translate(-50%,20px);background:#3a1505;color:#fff;padding:10px 16px;border-radius:999px;opacity:0;pointer-events:none;transition:.2s}.toast.show{opacity:1;transform:translate(-50%,0)}.legend{position:fixed;z-index:700;left:10px;bottom:24px;background:#fffffff0;border-radius:9px;padding:8px;font-size:10px;box-shadow:0 2px 8px #0003}.legend-row{display:flex;align-items:center;gap:5px;margin:3px}.legend-dot{width:9px;height:9px;border-radius:50%}.leaflet-marker-icon.cluster-marker{border-radius:50%;background:#6b2a0e;color:#fff;display:grid!important;place-items:center;border:3px solid #ffffffcc;box-shadow:0 2px 8px #0005;font-weight:700}
+@media(max-width:900px){header{padding:7px;gap:6px;max-height:132px;overflow:hidden}header h1{font-size:14px}.region-filters{order:3;width:100%;height:30px;overflow-x:auto;overflow-y:hidden;flex-wrap:nowrap}.stamp-counter{padding:4px 7px;gap:5px}.stamp-counter .sc-num{font-size:15px}.stamp-counter .sc-label{font-size:9px}.stamp-counter .sc-divider,.sc-bar-wrap{display:none}.top-actions{margin-left:auto}.icon-btn{font-size:0;padding:7px}.icon-btn::first-letter{font-size:15px}.search-tools{top:108px;left:48px;right:8px;flex-wrap:wrap}.search-box{width:calc(100% - 104px)}.advanced-filters{width:100%;max-height:55vh;overflow:auto}#map{min-height:280px}#panel{width:100%;height:min(75dvh,680px);top:auto;bottom:0;border-radius:18px 18px 0 0;transform:translateY(105%)}#panel.open{transform:none}.panel-photo,.photo-fallback{height:165px}.list-panel{width:100%}.list-head{padding-top:145px}.legend{display:none}}
+@media(prefers-reduced-motion:reduce){*{transition:none!important;scroll-behavior:auto!important}}
+</style>
+<style id="multilingualStyles">
+.language-picker{display:inline-flex;align-items:center;gap:5px;padding:0 8px;border:1px solid rgba(255,255,255,.48);border-radius:999px;background:rgba(255,255,255,.13);color:#fff;min-height:36px}
+.language-picker select{border:0;background:transparent;color:inherit;font:inherit;font-weight:700;outline:none;cursor:pointer}
+.language-picker option{color:#222;background:#fff}
+@media(max-width:700px){.language-picker{min-height:34px;padding:0 6px}.language-picker span{display:none}.language-picker select{max-width:100px;font-size:12px}}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🛁 日本 温泉地マップ</h1>
+  <div class="region-filters" id="regionFilters"></div>
+  <div class="stamp-counter" id="stampCounter">
+    <div class="sc-block">
+      <div class="sc-num sc-visited" id="visitedCount">0</div>
+      <div class="sc-label">訪問済み</div>
+    </div>
+    <div class="sc-divider"></div>
+    <div class="sc-block">
+      <div class="sc-num sc-remaining" id="remainingCount">100</div>
+      <div class="sc-label">未訪問</div>
+    </div>
+    <div class="sc-divider"></div>
+    <div class="sc-block sc-bar-wrap">
+      <div class="sc-bar-bg"><div class="sc-bar-fill" id="progressBar" style="width:0%"></div></div>
+      <div class="sc-bar-label" id="progressLabel">0 / 100 達成</div>
+    </div>
+  </div>
+  <div class="top-actions">
+    <label class="language-picker" aria-label="表示言語"><span aria-hidden="true">🌐</span><select id="languageSelect" aria-label="表示言語を選択"><option value="ja">日本語</option><option value="en">English</option><option value="zh-TW">繁體中文</option><option value="ko">한국어</option></select></label>
+    <button class="icon-btn" id="locateBtn" type="button" title="現在地周辺を表示">◎ 現在地</button>
+    <button class="icon-btn" id="savedBtn" type="button" title="保存・旅行計画">♡ 保存・計画</button>
+    <button class="icon-btn" id="dataBtn" type="button" title="共有・バックアップ">⇧ 共有</button>
+  </div>
+</header>
+
+<div id="map"></div>
+<div class="search-tools" role="search">
+  <div class="search-box"><input id="searchInput" type="search" placeholder="温泉名・泉質・効能・地域など" aria-label="温泉検索"><button id="clearSearch" type="button" aria-label="検索を消去">✕</button></div>
+  <button class="filter-toggle" id="advancedToggle" type="button" aria-expanded="false">⚙ 条件</button>
+  <button class="view-toggle" id="listToggle" type="button" aria-expanded="false">☷ 一覧</button>
+  <div class="advanced-filters" id="advancedFilters">
+    <div class="filter-grid">
+      <label class="field">泉質<select id="qualityFilter"><option value="">すべて</option><option>硫黄泉</option><option>塩化物泉</option><option>炭酸水素塩泉</option><option>単純泉</option><option>酸性泉</option><option>硫酸塩泉</option><option>放射能泉</option></select></label>
+      <label class="field">期待する特徴<select id="effectFilter"><option value="">すべて</option><option>美肌</option><option>冷え性</option><option>神経痛</option><option>疲労回復</option><option>皮膚病</option><option>リウマチ</option></select></label>
+      <label class="field">季節<select id="seasonFilter"><option value="">すべて</option><option>春</option><option>夏</option><option>秋</option><option>冬</option><option>通年</option></select></label>
+      <label class="field">アクセス<select id="accessFilter"><option value="">すべて</option><option value="train">公共交通向き</option><option value="car">車向き</option><option value="walk">徒歩を含む</option></select></label>
+      <label class="field">並び順<select id="sortFilter"><option value="default">標準</option><option value="distance">現在地から近い</option><option value="season">今の季節向き</option><option value="name">名前順</option></select></label>
+    </div>
+    <div class="check-row"><label><input id="wishOnly" type="checkbox"> 行きたいのみ</label><label><input id="unvisitedOnly" type="checkbox"> 未訪問のみ</label><label><input id="nowOnly" type="checkbox"> 今の季節向き</label></div>
+    <div class="result-count"><span id="resultCount">100件</span><button class="action-btn" id="resetFilters" type="button">条件をリセット</button></div>
+  </div>
+</div>
+<section class="list-panel" id="listPanel" aria-label="温泉一覧"><div class="list-head"><strong>温泉一覧</strong><button class="action-btn" id="closeList" type="button">閉じる</button></div><div class="spot-list" id="spotList"></div></section>
+<div class="legend" id="legend" aria-label="地域の色分け"></div>
+
+<div id="panel">
+  <button class="close-btn" onclick="closePanel()">✕</button>
+  <img class="panel-photo" id="panelPhoto" src="" alt="">
+  <div class="panel-body">
+    <div class="panel-name" id="panelName"></div>
+    <div class="panel-region-badge" id="panelBadge"></div>
+    <div class="panel-desc" id="panelDesc"></div>
+    <div class="panel-detail-row">
+      <span class="icon">💧</span>
+      <span class="label">泉質</span>
+      <span class="value" id="panelQuality"></span>
+    </div>
+    <div class="panel-detail-row">
+      <span class="icon">✨</span>
+      <span class="label">効能</span>
+      <span class="value" id="panelEffect"></span>
+    </div>
+    <div class="panel-detail-row">
+      <span class="icon">🗓</span>
+      <span class="label">シーズン</span>
+      <span class="value" id="panelSeason"></span>
+    </div>
+    <div class="panel-detail-row">
+      <span class="icon">🚗</span>
+      <span class="label">アクセス</span>
+      <span class="value" id="panelAccess"></span>
+    </div>
+    <div class="panel-url" id="panelUrl"></div>
+    <div class="panel-actions">
+      <button id="wishBtn" type="button">♡ 行きたい</button><button id="planBtn" type="button">＋ 旅行計画</button>
+      <button id="routeBtn" type="button">↗ 経路</button><button id="spotShareBtn" type="button">共有</button>
+      <button id="fallbackSearchBtn" type="button" style="grid-column:1/-1">🔎 公式リンクが開かない場合はこちら</button>
+    </div>
+    <div class="live-card"><strong>今日の温泉旅情報</strong><div id="liveInfo">温泉を選ぶと現地の天気を取得します。</div><div id="conditionAdvice"></div></div>
+    <div class="notice">効能表記は一般的な参考情報です。治療目的ではなく、持病・妊娠・飲酒後などは医師や施設の案内に従ってください。</div>
+    <label class="field" style="margin-top:12px">入浴・旅行メモ<textarea class="note-area" id="spotNote" placeholder="訪問日、湯の感想、宿、立ち寄り湯など"></textarea></label>
+    <div class="action-row"><button class="action-btn" id="saveNoteBtn" type="button">メモを保存</button><label class="action-btn">写真を追加<input id="photoInput" type="file" accept="image/*" hidden></label></div>
+    <div id="userPhoto"></div>
+    <button class="visit-btn" id="visitBtn" onclick="toggleVisited()">
+      <span id="visitBtnIcon">☐</span>
+      <span id="visitBtnText">訪問済みにする</span>
+    </button>
+  </div>
+</div>
+
+<aside class="drawer" id="savedDrawer" aria-label="保存と旅行計画"><div class="drawer-head"><strong>保存・温泉旅行計画</strong><button class="drawer-close" data-close="savedDrawer" aria-label="閉じる">×</button></div><div class="drawer-body"><div class="tabs"><button class="tab-btn active" data-tab="wishes">行きたい</button><button class="tab-btn" data-tab="plan">旅行計画</button></div><div id="savedContent"></div></div></aside>
+<aside class="drawer" id="dataDrawer" aria-label="共有とバックアップ"><div class="drawer-head"><strong>共有・バックアップ</strong><button class="drawer-close" data-close="dataDrawer" aria-label="閉じる">×</button></div><div class="drawer-body"><p style="line-height:1.7;color:#555">訪問履歴・行きたい・旅行計画・メモを端末間で移動できます。</p><div class="action-row"><button class="action-btn primary" id="copyShareBtn">共有リンクをコピー</button><button class="action-btn" id="exportBtn">JSONを書き出す</button><label class="action-btn">JSONを読み込む<input id="importInput" type="file" accept="application/json" hidden></label><button class="action-btn danger" id="clearDataBtn">保存データを消去</button></div></div></aside>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+const REGION_COLORS = {
+  "北海道":"#1565c0",
+  "東北":"#6a1b9a",
+  "関東・甲信越":"#bf360c",
+  "中部・北陸":"#e65100",
+  "近畿":"#ad1457",
+  "中国":"#2e7d32",
+  "四国":"#00838f",
+  "九州・沖縄":"#b71c1c"
+};
+
+const onsen = [
+  // 北海道 (10)
+  { name:"登別温泉", region:"北海道", lat:42.429, lng:141.105,
+    desc:"「地獄谷」で有名な北海道最大の温泉地。多種多様な泉質を誇り、日本屈指の湯量を誇る。クマ牧場や地獄谷遊歩道も人気。",
+    quality:"硫黄泉・食塩泉・明礬泉など9種類", effect:"神経痛・皮膚病・疲労回復・リウマチ",
+    season:"通年（冬は雪景色の露天風呂が絶品）", access:"登別駅からバスで約15分",
+    photo:"https://source.unsplash.com/800x400/?noboribetsu,hot+spring", url:"https://www.noboribetsu-spa.jp/" },
+  { name:"洞爺湖温泉", region:"北海道", lat:42.536, lng:140.786,
+    desc:"カルデラ湖「洞爺湖」の湖畔に広がる温泉リゾート。夏の長期花火大会や遊覧船が人気。世界ジオパークにも認定。",
+    quality:"塩化物泉（ナトリウム塩化物泉）", effect:"冷え性・疲労回復・神経痛・婦人病",
+    season:"通年（4〜10月が最適）", access:"洞爺駅からバスで約15分",
+    photo:"https://source.unsplash.com/800x400/?toya,lake,japan", url:"https://www.laketoya.com/" },
+  { name:"定山渓温泉", region:"北海道", lat:43.007, lng:141.101,
+    desc:"札幌市内から車で約1時間の「札幌の奥座敷」。豊平川の渓谷沿いに旅館が立ち並び、紅葉の名所としても有名。",
+    quality:"塩化物泉・硫酸塩泉", effect:"疲労回復・冷え性・神経痛・切り傷",
+    season:"通年（紅葉期10月が特に人気）", access:"札幌駅からバスで約70分",
+    photo:"https://source.unsplash.com/800x400/?jozankei,autumn,japan", url:"https://jozankei.jp/" },
+  { name:"層雲峡温泉", region:"北海道", lat:43.741, lng:142.949,
+    desc:"大雪山国立公園の玄関口。断崖絶壁が続く層雲峡の渓谷美は圧巻で、冬の「氷瀑まつり」も有名。",
+    quality:"塩化物泉（ナトリウム・カルシウム塩化物泉）", effect:"冷え性・疲労回復・神経痛・リウマチ",
+    season:"通年（冬の氷瀑・夏の登山シーズン）", access:"上川駅からバスで約30分",
+    photo:"https://source.unsplash.com/800x400/?sounkyo,gorge,hokkaido", url:"https://sounkyo.net/" },
+  { name:"阿寒湖温泉", region:"北海道", lat:43.449, lng:144.100,
+    desc:"天然記念物マリモが生息する阿寒湖畔の温泉。アイヌ文化の拠点でもあり、アイヌコタン（集落）でコシャンベやイオマンテの儀式を見ることができる。",
+    quality:"硫酸塩泉・塩化物泉", effect:"疲労回復・神経痛・リウマチ・美肌",
+    season:"通年（4〜11月がベスト）", access:"釧路空港から車で約90分",
+    photo:"https://source.unsplash.com/800x400/?akan,lake,hokkaido", url:"https://www.lake-akan.com/" },
+  { name:"知床ウトロ温泉", region:"北海道", lat:44.072, lng:144.984,
+    desc:"世界自然遺産「知床半島」の拠点温泉地。流氷・ヒグマ・オジロワシなど大自然の迫力を温泉で癒す贅沢な体験が魅力。",
+    quality:"塩化物泉（ナトリウム塩化物泉）", effect:"疲労回復・冷え性・神経痛",
+    season:"4〜11月（流氷期2〜3月は特に貴重）", access:"女満別空港から車で約2時間",
+    photo:"https://source.unsplash.com/800x400/?shiretoko,hokkaido,nature", url:"https://www.shiretoko.asia/" },
+  { name:"ニセコ温泉郷", region:"北海道", lat:42.865, lng:140.686,
+    desc:"国際的スキーリゾートとしても有名なニセコ。羊蹄山を望む露天風呂は絶景で、パウダースノーと温泉を楽しめる冬が人気。",
+    quality:"硫黄泉・重炭酸土類泉", effect:"疲労回復・神経痛・皮膚病・リウマチ",
+    season:"通年（スキーは12〜3月）", access:"ニセコ駅から各温泉へシャトルバス",
+    photo:"https://source.unsplash.com/800x400/?niseko,ski,japan", url:"https://www.niseko-ta.jp/" },
+  { name:"支笏湖温泉", region:"北海道", lat:42.697, lng:141.364,
+    desc:"透明度抜群のカルデラ湖「支笏湖」湖畔の温泉。カヌーやダイビングなどアクティビティと組み合わせて楽しめる。",
+    quality:"炭酸水素塩泉", effect:"神経痛・筋肉痛・疲労回復・美肌",
+    season:"通年（冬の「氷濤まつり」は幻想的）", access:"千歳駅からバスで約40分",
+    photo:"https://source.unsplash.com/800x400/?shikotsu,lake,japan", url:"https://www.visit-hokkaido.jp/" },
+  { name:"豊富温泉", region:"北海道", lat:45.102, lng:141.770,
+    desc:"日本最北の温泉地。石油の随伴ガスと共に湧出する全国でも珍しい石油成分含有温泉で、アトピー治療に効果があると注目されている。",
+    quality:"含油食塩泉（塩化物泉）", effect:"アトピー性皮膚炎・皮膚病・神経痛",
+    season:"通年", access:"豊富駅から車で約5分",
+    photo:"https://source.unsplash.com/800x400/?hokkaido,onsen,japan", url:"https://www.toyotomi-onsen.com/" },
+  { name:"十勝川温泉", region:"北海道", lat:42.843, lng:143.426,
+    desc:"植物性モール温泉として有名。太古の植物が堆積した「モール」を含む珍しい温泉で、美肌効果が高く「美人の湯」として知られる。",
+    quality:"モール泉（植物性腐植質食塩泉）", effect:"美肌・神経痛・疲労回復・慢性皮膚病",
+    season:"通年（冬の白鳥観察と組み合わせが人気）", access:"帯広駅からバスで約40分",
+    photo:"https://source.unsplash.com/800x400/?tokachi,hokkaido", url:"https://www.tokachigawa.net/" },
+
+  // 東北 (14)
+  { name:"酸ヶ湯温泉", region:"東北", lat:40.659, lng:140.877,
+    desc:"八甲田山中に湧く日本最古の湯治場のひとつ。千人風呂と称される大きなヒバ造り混浴浴槽が有名。秘湯の趣たっぷり。",
+    quality:"酸性硫黄泉（含硫化水素酸性泉）", effect:"リウマチ・神経痛・皮膚病・糖尿病",
+    season:"通年（冬は豪雪で陸の孤島に）", access:"青森駅からバスで約65分",
+    photo:"https://source.unsplash.com/800x400/?aomori,onsen,snow", url:"https://sukayu.jp/" },
+  { name:"乳頭温泉郷", region:"東北", lat:39.743, lng:140.725,
+    desc:"秋田県の秘湯。鶴の湯・妙乃湯など個性豊かな7湯が点在する湯巡りで有名。乳白色の湯が美しい鶴の湯が特に有名。",
+    quality:"硫黄泉・炭酸水素塩泉（宿により異なる）", effect:"神経痛・リウマチ・疲労回復・美肌",
+    season:"通年（冬の雪見風呂が絶景）", access:"田沢湖駅からバスで約45分",
+    photo:"https://source.unsplash.com/800x400/?nyuto,akita,onsen", url:"https://akita-fun.jp/" },
+  { name:"蔵王温泉", region:"東北", lat:38.355, lng:140.454,
+    desc:"山形蔵王スキー場の麓に湧く強酸性の温泉。白濁した湯と樹氷（アイスモンスター）のコラボが冬の風物詩。",
+    quality:"酸性硫酸塩塩化物泉", effect:"神経痛・筋肉痛・慢性皮膚病・疲労回復",
+    season:"通年（冬の樹氷ツアーが特に人気）", access:"山形駅からバスで約40分",
+    photo:"https://source.unsplash.com/800x400/?zao,onsen,japan", url:"https://www.zao-spa.or.jp/" },
+  { name:"鳴子温泉郷", region:"東北", lat:38.739, lng:140.605,
+    desc:"宮城の奥座敷。日本にある泉質11種類のうち9種類が揃う多彩な温泉地。こけしの産地としても有名。",
+    quality:"硫黄泉・塩化物泉ほか多数", effect:"神経痛・リウマチ・疲労回復・美肌",
+    season:"通年（紅葉の10月が最も賑わう）", access:"鳴子温泉駅から徒歩圏内",
+    photo:"https://source.unsplash.com/800x400/?naruko,miyagi,japan", url:"https://www.naruko.gr.jp/" },
+  { name:"銀山温泉", region:"東北", lat:38.622, lng:140.465,
+    desc:"大正ロマン漂う木造旅館が白銀川沿いに並ぶ絵葉書のような温泉街。夕刻にガス灯が灯る風景は映画のよう。",
+    quality:"塩化物泉・炭酸水素塩泉", effect:"神経痛・疲労回復・冷え性・美肌",
+    season:"通年（雪景色の冬が最も幻想的）", access:"大石田駅からバスで約40分",
+    photo:"https://source.unsplash.com/800x400/?ginzan,onsen,yamagata", url:"https://www.ginzanonsen.jp/" },
+  { name:"花巻温泉郷", region:"東北", lat:39.418, lng:141.152,
+    desc:"宮沢賢治の故郷・花巻市の温泉。台温泉・花巻温泉など複数の温泉地からなる湯巡りが楽しい温泉郷。",
+    quality:"塩化物泉・炭酸水素塩泉", effect:"神経痛・疲労回復・慢性消化器病・冷え性",
+    season:"通年", access:"花巻駅からバスで約30分",
+    photo:"https://source.unsplash.com/800x400/?hanamaki,iwate,japan", url:"https://iwatetabi.jp/" },
+  { name:"秋保温泉", region:"東北", lat:38.295, lng:140.701,
+    desc:"仙台の奥座敷として古くから親しまれてきた温泉。秋保大滝や磊々峡などの自然美も魅力。大型旅館が多く仙台観光の拠点に最適。",
+    quality:"塩化物泉（ナトリウム塩化物泉）", effect:"疲労回復・神経痛・冷え性・皮膚病",
+    season:"通年", access:"仙台駅からバスで約40分",
+    photo:"https://source.unsplash.com/800x400/?akiu,sendai,onsen", url:"https://www.miyagi-kankou.or.jp/" },
+  { name:"東山温泉", region:"東北", lat:37.490, lng:139.934,
+    desc:"「会津の奥座敷」として知られる会津若松の名湯。鶴ヶ城から近く、会津観光の拠点として人気。",
+    quality:"塩化物泉・硫酸塩泉", effect:"疲労回復・神経痛・リウマチ・慢性皮膚病",
+    season:"通年（紅葉シーズンが特に美しい）", access:"会津若松駅からバスで約10分",
+    photo:"https://source.unsplash.com/800x400/?aizuwakamatsu,fukushima,japan", url:"https://www.tif.ne.jp/" },
+  { name:"飯坂温泉", region:"東北", lat:37.785, lng:140.420,
+    desc:"松尾芭蕉も訪れた東北最古の温泉のひとつ。共同浴場「鯖湖湯」を中心とした湯巡りと、古くからの温泉文化が根付く。",
+    quality:"塩化物泉（ナトリウム塩化物泉）", effect:"疲労回復・神経痛・冷え性・消化器病",
+    season:"通年", access:"飯坂温泉駅から徒歩すぐ",
+    photo:"https://source.unsplash.com/800x400/?iizaka,fukushima,onsen", url:"https://www.iizaka.com/" },
+  { name:"土湯温泉", region:"東北", lat:37.716, lng:140.302,
+    desc:"福島市西方に位置する温泉地。こけし人形の産地でもあり、荒川渓谷沿いに旅館が点在する落ち着いた雰囲気が特徴。",
+    quality:"炭酸水素塩泉・塩化物泉", effect:"神経痛・疲労回復・慢性皮膚病・冷え性",
+    season:"通年", access:"福島駅からバスで約50分",
+    photo:"https://source.unsplash.com/800x400/?tuchiyu,fukushima,japan", url:"https://www.tif.ne.jp/" },
+  { name:"磐梯熱海温泉", region:"東北", lat:37.459, lng:140.140,
+    desc:"磐梯山麓の五色沼にも近い温泉地。郡山市の奥座敷として親しまれ、豊富な湯量と多彩な宿泊施設が揃う。",
+    quality:"塩化物泉・炭酸水素塩泉", effect:"疲労回復・神経痛・リウマチ・冷え性",
+    season:"通年", access:"磐梯熱海駅から徒歩すぐ",
+    photo:"https://source.unsplash.com/800x400/?bandai,fukushima,japan", url:"https://www.bandaiatami.or.jp/" },
+  { name:"遠刈田温泉", region:"東北", lat:38.148, lng:140.608,
+    desc:"蔵王連峰の麓に湧く温泉地。こけし発祥の地のひとつとして有名で、蔵王と松島の中間にある観光拠点。",
+    quality:"塩化物泉（ナトリウム塩化物泉）", effect:"疲労回復・神経痛・筋肉痛・美肌",
+    season:"通年（蔵王スキーシーズンは冬も人気）", access:"白石蔵王駅からバスで約30分",
+    photo:"https://source.unsplash.com/800x400/?zaom,miyagi,japan", url:"https://www.togatta.com/" },
+  { name:"夏油温泉", region:"東北", lat:39.428, lng:140.923,
+    desc:"岩手県北上市の秘湯。複数の源泉が湧き出る野湯が有名で、大湯・滝の湯など野趣溢れる露天風呂が楽しめる冬季閉鎖の山の温泉。",
+    quality:"硫黄泉・炭酸水素塩泉", effect:"神経痛・リウマチ・皮膚病・疲労回復",
+    season:"5月〜11月（冬季閉鎖）", access:"北上駅から車で約60分",
+    photo:"https://source.unsplash.com/800x400/?iwate,onsen,nature", url:"https://iwatetabi.jp/" },
+  { name:"大鰐温泉", region:"東北", lat:40.513, lng:140.566,
+    desc:"青森県随一の温泉地として名高い大鰐。古くから「津軽の奥座敷」として親しまれ、スキー場と温泉が楽しめる。",
+    quality:"塩化物泉（ナトリウム塩化物泉）", effect:"疲労回復・神経痛・リウマチ・冷え性",
+    season:"通年", access:"大鰐温泉駅から徒歩すぐ",
+    photo:"https://source.unsplash.com/800x400/?aomori,onsen,japan", url:"https://aomori-tourism.com/" },
+
+  // 関東・甲信越 (15)
+  { name:"草津温泉", region:"関東・甲信越", lat:36.619, lng:138.596,
+    desc:"「日本三名湯」のひとつ。強酸性の硫黄泉と「湯もみ」文化が有名。湯畑を中心とした温泉街は風情満点で年間200万人以上が訪れる。",
+    quality:"酸性塩化物硫酸塩泉", effect:"皮膚病・糖尿病・神経痛・リウマチ",
+    season:"通年（スキーの冬・新緑の夏どちらも人気）", access:"長野原草津口駅からバスで約25分",
+    photo:"https://source.unsplash.com/800x400/?kusatsu,onsen,japan", url:"https://www.kusatsu-onsen.ne.jp/" },
+  { name:"伊香保温泉", region:"関東・甲信越", lat:36.489, lng:138.891,
+    desc:"石段街で有名な上州の名湯。茶褐色の黄金の湯と透明の白銀の湯の2種類の源泉を持つ。徳冨蘆花ゆかりの地でもある。",
+    quality:"塩化物硫酸塩泉（黄金の湯）・炭酸水素塩泉（白銀の湯）", effect:"疲労回復・神経痛・婦人病・冷え性",
+    season:"通年", access:"渋川駅からバスで約20分",
+    photo:"https://source.unsplash.com/800x400/?ikaho,gunma,onsen", url:"https://www.ikaho-kankou.com/" },
+  { name:"四万温泉", region:"関東・甲信越", lat:36.574, lng:138.756,
+    desc:"群馬の山あいに湧く「四万の病を癒す」という言い伝えの湯。青いコバルトブルーの積善館が幻想的で、宮崎映画のモデルとも言われる。",
+    quality:"塩化物泉・炭酸水素塩泉", effect:"消化器病・神経痛・疲労回復・婦人病",
+    season:"通年（新緑・紅葉が特に美しい）", access:"中之条駅からバスで約40分",
+    photo:"https://source.unsplash.com/800x400/?shima,onsen,gunma", url:"https://gunma-kanko.jp/" },
+  { name:"水上温泉", region:"関東・甲信越", lat:36.731, lng:138.985,
+    desc:"利根川の源流域に湧く温泉リゾート。ラフティングやSLみなかみなどアクティビティが豊富で、冬のスキーと温泉の組み合わせが人気。",
+    quality:"塩化物泉（ナトリウム塩化物泉）", effect:"疲労回復・神経痛・冷え性・リウマチ",
+    season:"通年（ラフティングは5〜10月）", access:"水上駅から徒歩・バス",
+    photo:"https://source.unsplash.com/800x400/?minakami,gunma,river", url:"https://gunma-kanko.jp/" },
+  { name:"宝川温泉", region:"関東・甲信越", lat:36.780, lng:139.003,
+    desc:"日本最大級の混浴露天風呂で知られる秘湯。4つの大露天風呂の総面積は470㎡以上。水上温泉郷の最奥に位置する一軒宿。",
+    quality:"塩化物泉", effect:"疲労回復・神経痛・リウマチ",
+    season:"通年（雪見露天が特に人気）", access:"水上駅からバスで約40分",
+    photo:"https://source.unsplash.com/800x400/?takaragawa,onsen,japan", url:"https://www.takaragawa.com/" },
+  { name:"万座温泉", region:"関東・甲信越", lat:36.577, lng:138.508,
+    desc:"標高1,800mに位置する日本最高所の温泉。硫黄成分が特に濃く、白濁した湯は独特。草津よりもさらに山奥の秘湯感がある。",
+    quality:"酸性硫黄泉", effect:"神経痛・リウマチ・皮膚病・慢性婦人病",
+    season:"通年（スキーシーズンは特に賑わう）", access:"軽井沢駅から車で約50分",
+    photo:"https://source.unsplash.com/800x400/?manza,onsen,gunma", url:"https://www.manza.co.jp/" },
+  { name:"箱根温泉", region:"関東・甲信越", lat:35.232, lng:139.107,
+    desc:"首都圏随一の温泉リゾート地。多彩な泉質と美術館・絶景が揃い、富士山を望む露天風呂が人気。年間2,000万人以上が訪れる。",
+    quality:"塩化物泉・硫酸塩泉・炭酸水素塩泉ほか多数", effect:"疲労回復・神経痛・美肌・冷え性",
+    season:"通年", access:"小田急ロマンスカーで新宿から約90分",
+    photo:"https://source.unsplash.com/800x400/?hakone,fuji,onsen", url:"https://www.hakone.or.jp/" },
+  { name:"熱海温泉", region:"関東・甲信越", lat:35.100, lng:139.073,
+    desc:"東海道の要衝に湧く日本屈指の温泉地。徳川家康も愛した名湯で、熱海海上花火大会や熱海サンビーチなど海岸リゾートとしても人気。",
+    quality:"塩化物泉（ナトリウム・カルシウム塩化物泉）", effect:"疲労回復・神経痛・冷え性・美肌",
+    season:"通年", access:"東海道新幹線・こだまで東京から約45分",
+    photo:"https://source.unsplash.com/800x400/?atami,shizuoka,japan", url:"https://www.ataminews.gr.jp/" },
+  { name:"伊東温泉", region:"関東・甲信越", lat:34.964, lng:139.098,
+    desc:"伊豆最大の温泉地。豊富な湯量（毎分3万リットル）と200以上の源泉を誇り、「日本三大温泉」のひとつに数えられる説も。",
+    quality:"塩化物泉（ナトリウム・カルシウム塩化物泉）", effect:"疲労回復・神経痛・筋肉痛・慢性皮膚病",
+    season:"通年", access:"東京駅から特急踊り子で約1時間40分",
+    photo:"https://source.unsplash.com/800x400/?ito,izu,japan", url:"https://www.itospa.com/" },
+  { name:"修善寺温泉", region:"関東・甲信越", lat:34.979, lng:138.929,
+    desc:"伊豆最古の温泉。修禅寺を中心とした竹林の小径など風情ある温泉街が広がる。夏目漱石や川端康成も愛した文学の地。",
+    quality:"塩化物泉", effect:"疲労回復・神経痛・冷え性・婦人病",
+    season:"通年（梅・桜・紅葉と四季折々の美しさ）", access:"修善寺駅からバスで約10分",
+    photo:"https://source.unsplash.com/800x400/?shuzenji,izu,japan", url:"https://hellonavi.jp/" },
+  { name:"湯河原温泉", region:"関東・甲信越", lat:35.150, lng:139.106,
+    desc:"万葉集にも詠まれた古湯。相模湾を望む丘陵地に旅館が点在し、東京近郊の隠れ家的温泉として文人墨客に愛されてきた。",
+    quality:"塩化物泉（ナトリウム・カルシウム塩化物泉）", effect:"疲労回復・神経痛・慢性婦人病・冷え性",
+    season:"通年（梅林で有名な2月も人気）", access:"湯河原駅からバスで約10分",
+    photo:"https://source.unsplash.com/800x400/?yugawara,kanagawa,japan", url:"https://www.yugawara.or.jp/" },
+  { name:"鬼怒川温泉", region:"関東・甲信越", lat:36.798, lng:139.662,
+    desc:"日光の奥に湧く関東有数の温泉リゾート。鬼怒川の渓谷沿いに大型旅館が立ち並び、SL大樹や日光東照宮観光の拠点としても人気。",
+    quality:"アルカリ性単純泉", effect:"疲労回復・神経痛・リウマチ・冷え性",
+    season:"通年", access:"東武日光線 鬼怒川温泉駅から徒歩",
+    photo:"https://source.unsplash.com/800x400/?kinugawa,nikko,japan", url:"https://www.tochigiji.or.jp/" },
+  { name:"塩原温泉郷", region:"関東・甲信越", lat:36.927, lng:139.838,
+    desc:"箒川沿いに11の温泉地が点在する温泉郷。11種類もの泉質が揃い「温泉博士」も訪れる多様な湯が魅力。",
+    quality:"硫酸塩泉・塩化物泉ほか11種", effect:"神経痛・疲労回復・慢性皮膚病・消化器病",
+    season:"通年（紅葉の10月が特に美しい）", access:"那須塩原駅からバスで約50分",
+    photo:"https://source.unsplash.com/800x400/?shiobara,tochigi,japan", url:"https://www.siobara.or.jp/" },
+  { name:"那須温泉郷", region:"関東・甲信越", lat:37.108, lng:139.966,
+    desc:"那須岳の麓に広がる温泉リゾート。殺生石の「鹿の湯」をはじめ多彩な湯めぐりが楽しめ、那須ハイランドパーク観光との組み合わせも人気。",
+    quality:"酸性硫酸塩泉・塩化物泉", effect:"神経痛・リウマチ・疲労回復・皮膚病",
+    season:"通年（新緑・紅葉・スキーが人気）", access:"那須塩原駅からバスで約45分",
+    photo:"https://source.unsplash.com/800x400/?nasu,tochigi,japan", url:"https://www.tochigiji.or.jp/" },
+  { name:"石和温泉", region:"関東・甲信越", lat:35.648, lng:138.656,
+    desc:"甲府盆地に湧く山梨県最大の温泉地。ぶどう畑の中に旅館が点在し、ワインと温泉を組み合わせた旅が楽しめる。富士山・南アルプスの絶景も。",
+    quality:"アルカリ性単純温泉", effect:"疲労回復・神経痛・冷え性・美肌",
+    season:"通年（ぶどう・ワインの秋が特に人気）", access:"石和温泉駅から徒歩すぐ",
+    photo:"https://source.unsplash.com/800x400/?isawa,yamanashi,japan", url:"https://www.yamanashi-kankou.jp/" },
+
+  // 中部・北陸 (15)
+  { name:"下呂温泉", region:"中部・北陸", lat:35.803, lng:137.245,
+    desc:"「日本三名泉」のひとつ。飛騨川沿いに旅館が並ぶ風情ある温泉街で、無色透明のナトリウム炭酸水素塩泉は美肌効果が高い。",
+    quality:"アルカリ性単純温泉（炭酸水素塩泉）", effect:"美肌・神経痛・疲労回復・慢性消化器病",
+    season:"通年", access:"名古屋駅から特急ひだで約1時間40分",
+    photo:"https://source.unsplash.com/800x400/?gero,gifu,onsen", url:"https://www.gero-spa.com/" },
+  { name:"奥飛騨温泉郷", region:"中部・北陸", lat:36.266, lng:137.546,
+    desc:"北アルプスの麓に点在する5つの温泉地（平湯・福地・新平湯・栃尾・新穂高）の総称。露天風呂の数は日本一を誇る。",
+    quality:"単純温泉・炭酸水素塩泉・塩化物泉", effect:"疲労回復・神経痛・美肌・リウマチ",
+    season:"通年（紅葉の秋・雪見の冬が絶景）", access:"高山駅からバスで約1時間",
+    photo:"https://source.unsplash.com/800x400/?okuhida,alps,japan", url:"https://www.okuhida.or.jp/" },
+  { name:"白骨温泉", region:"中部・北陸", lat:36.261, lng:137.720,
+    desc:"「3日入れば3年風邪をひかない」という白濁の美肌の湯。上高地に近い山岳温泉で、神秘的な白濁色の野天風呂が有名な秘湯。",
+    quality:"含硫黄カルシウム・マグネシウム炭酸水素塩泉", effect:"疲労回復・神経痛・消化器病・皮膚病",
+    season:"4月下旬〜11月（冬季は一部閉鎖）", access:"松本駅からバスで約2時間",
+    photo:"https://source.unsplash.com/800x400/?shirahone,nagano,onsen", url:"https://www.shirahone.org/" },
+  { name:"野沢温泉", region:"中部・北陸", lat:36.930, lng:138.439,
+    desc:"共同浴場「外湯」が13か所ある信州の名湯。野沢菜の発祥地でもあり、温泉街の散策と外湯めぐりが旅の醍醐味。冬はスキーも人気。",
+    quality:"塩化物泉・硫酸塩泉", effect:"神経痛・リウマチ・疲労回復・婦人病",
+    season:"通年（スキーは11月〜4月）", access:"飯山駅からバスで約25分",
+    photo:"https://source.unsplash.com/800x400/?nozawa,nagano,onsen", url:"https://nozawakanko.jp/" },
+  { name:"渋温泉", region:"中部・北陸", lat:36.750, lng:138.393,
+    desc:"9つの外湯めぐりで有名な長野の古湯。地獄谷野猿公苑の雪見露天風呂に入るニホンザルの姿が世界的に有名。",
+    quality:"塩化物泉・硫酸塩泉", effect:"神経痛・疲労回復・慢性皮膚病・リウマチ",
+    season:"通年（雪の猿で有名な冬がハイシーズン）", access:"湯田中駅からバスで約10分",
+    photo:"https://source.unsplash.com/800x400/?shibu,nagano,monkey,onsen", url:"https://www.shibuonsen.net/" },
+  { name:"別所温泉", region:"中部・北陸", lat:36.363, lng:138.146,
+    desc:"「信州の鎌倉」とも称される北向観音で有名な上田の温泉。外湯3か所をめぐる湯めぐりと、重要文化財の三重塔が見どころ。",
+    quality:"塩化物泉（ナトリウム塩化物泉）", effect:"疲労回復・神経痛・リウマチ・美肌",
+    season:"通年", access:"別所温泉駅から徒歩すぐ",
+    photo:"https://source.unsplash.com/800x400/?bessho,nagano,japan", url:"https://bessho-onsen.com/" },
+  { name:"諏訪温泉", region:"中部・北陸", lat:36.040, lng:138.114,
+    desc:"諏訪湖畔に湧く歴史ある温泉地。全国の諏訪神社の総本社「諏訪大社」のお膝元で、日本最古の神社のひとつと温泉を楽しめる。",
+    quality:"塩化物泉（ナトリウム・カルシウム塩化物泉）", effect:"疲労回復・神経痛・慢性婦人病・冷え性",
+    season:"通年（冬の御神渡りが有名）", access:"上諏訪駅から徒歩すぐ",
+    photo:"https://source.unsplash.com/800x400/?suwa,nagano,lake", url:"https://www.suwa-tourism.jp/" },
+  { name:"山代温泉", region:"中部・北陸", lat:36.310, lng:136.356,
+    desc:"加賀温泉郷を代表する温泉地。与謝野晶子や泉鏡花など多くの文人に愛され、菊の湯を中心とした風情ある温泉街が広がる。",
+    quality:"塩化物泉（ナトリウム塩化物泉）", effect:"神経痛・疲労回復・慢性皮膚病・冷え性",
+    season:"通年", access:"加賀温泉駅からバスで約10分",
+    photo:"https://source.unsplash.com/800x400/?yamashiro,ishikawa,onsen", url:"https://www.yamashiro-spa.or.jp/" },
+  { name:"山中温泉", region:"中部・北陸", lat:36.257, lng:136.407,
+    desc:"松尾芭蕉が「殊勝の湯」と称えた加賀の名湯。鶴仙渓の渓谷沿いに旅館が立ち並ぶ情緒豊かな温泉街。九谷焼の産地でもある。",
+    quality:"塩化物泉（ナトリウム・カルシウム塩化物泉）", effect:"疲労回復・神経痛・慢性消化器病・婦人病",
+    season:"通年（渓谷の紅葉が特に美しい）", access:"加賀温泉駅からバスで約25分",
+    photo:"https://source.unsplash.com/800x400/?yamanaka,kaga,onsen", url:"https://www.yamanaka-spa.or.jp/" },
+  { name:"片山津温泉", region:"中部・北陸", lat:36.319, lng:136.314,
+    desc:"柴山潟湖畔に湧く加賀温泉郷の温泉地。湖の中央に噴き上がる間欠泉と白山の眺望が美しく、趣のある湯の街。",
+    quality:"塩化物泉（ナトリウム塩化物泉）", effect:"疲労回復・神経痛・冷え性・美肌",
+    season:"通年", access:"加賀温泉駅からバスで約10分",
+    photo:"https://source.unsplash.com/800x400/?katayamazu,ishikawa,lake", url:"https://www.katayamazu-spa.or.jp/" },
+  { name:"和倉温泉", region:"中部・北陸", lat:37.003, lng:136.997,
+    desc:"「能登の奥座敷」として知られる石川県最大の温泉地。七尾湾を望む絶景と豊富な湯量、海の幸が魅力。加賀屋など名旅館が揃う。",
+    quality:"塩化物泉（ナトリウム・カルシウム塩化物泉）", effect:"疲労回復・神経痛・慢性皮膚病・冷え性",
+    season:"通年", access:"和倉温泉駅からバスで約5分",
+    photo:"https://source.unsplash.com/800x400/?wakura,noto,onsen", url:"https://www.wakura.or.jp/" },
+  { name:"芦原温泉", region:"中部・北陸", lat:36.189, lng:136.213,
+    desc:"北陸の温泉リゾート。越前海岸に近く、日本海の新鮮な海の幸と温泉を同時に楽しめる。芦原温泉えちぜん鉄道の終点でアクセスも良好。",
+    quality:"塩化物泉（ナトリウム・カルシウム塩化物泉）", effect:"疲労回復・神経痛・婦人病・冷え性",
+    season:"通年（越前ガニの冬が最盛期）", access:"芦原温泉駅からバスで約10分",
+    photo:"https://source.unsplash.com/800x400/?awara,fukui,onsen", url:"https://www.awara-onsen.org/" },
+  { name:"粟津温泉", region:"中部・北陸", lat:36.265, lng:136.452,
+    desc:"718年開湯伝説を持つ加賀の古湯。日本最古の旅館「法師」がある温泉地として世界的にも有名。静かで落ち着いた雰囲気。",
+    quality:"塩化物泉（ナトリウム塩化物泉）", effect:"疲労回復・神経痛・リウマチ・慢性消化器病",
+    season:"通年", access:"小松駅からバスで約30分",
+    photo:"https://source.unsplash.com/800x400/?awazu,ishikawa,japan", url:"https://www.hot-ishikawa.jp/" },
+  { name:"越後湯沢温泉", region:"中部・北陸", lat:36.931, lng:138.815,
+    desc:"川端康成の小説「雪国」の舞台。日本屈指のスキーリゾートとして知られ、越後の山々と雪景色の中で楽しむ温泉が旅情を誘う。",
+    quality:"単純温泉", effect:"疲労回復・神経痛・冷え性・美肌",
+    season:"通年（スキーは12〜3月）", access:"上越新幹線 越後湯沢駅から徒歩すぐ",
+    photo:"https://source.unsplash.com/800x400/?yuzawa,niigata,snow,onsen", url:"https://www.e-yuzawa.gr.jp/" },
+  { name:"月岡温泉", region:"中部・北陸", lat:37.889, lng:139.357,
+    desc:"エメラルドグリーンの硫黄泉が特徴的な新潟の温泉地。「美人の湯」として知られ、温泉街の食べ歩きや芸妓文化も魅力。",
+    quality:"含硫黄ナトリウム塩化物泉", effect:"美肌・神経痛・疲労回復・慢性皮膚病",
+    season:"通年", access:"豊栄駅からバスで約35分",
+    photo:"https://source.unsplash.com/800x400/?tsukioka,niigata,onsen", url:"https://niigata-kankou.or.jp/" },
+
+  // 近畿 (10)
+  { name:"城崎温泉", region:"近畿", lat:35.617, lng:134.810,
+    desc:"志賀直哉の小説「城の崎にて」で有名な兵庫の名湯。7つの外湯めぐりと浴衣でそぞろ歩く情緒ある温泉街は関西随一。",
+    quality:"塩化物泉（ナトリウム塩化物泉）", effect:"疲労回復・神経痛・慢性婦人病・冷え性",
+    season:"通年（松葉ガニの冬が特に人気）", access:"城崎温泉駅から徒歩すぐ",
+    photo:"https://source.unsplash.com/800x400/?kinosaki,onsen,hyogo", url:"https://www.kinosaki-spa.gr.jp/" },
+  { name:"有馬温泉", region:"近畿", lat:34.797, lng:135.249,
+    desc:"「日本三名湯」のひとつ。大阪・神戸に近い最も便利な温泉地。「金の湯」（鉄分を含む茶褐色）と「銀の湯」（炭酸泉）の2種類の湯が有名。",
+    quality:"含鉄強塩化物泉（金の湯）・炭酸水素塩泉（銀の湯）", effect:"神経痛・筋肉痛・冷え性・疲労回復",
+    season:"通年", access:"神戸電鉄 有馬温泉駅から徒歩すぐ",
+    photo:"https://source.unsplash.com/800x400/?arima,onsen,kobe", url:"https://www.arima-onsen.com/" },
+  { name:"白浜温泉", region:"近畿", lat:33.683, lng:135.371,
+    desc:"熊野古道に近い和歌山の温泉リゾート。パンダで有名なアドベンチャーワールド、円月島の絶景、白良浜の白砂が揃うリゾート地。",
+    quality:"塩化物泉（ナトリウム塩化物泉）", effect:"疲労回復・神経痛・冷え性・慢性皮膚病",
+    season:"通年（海水浴の夏が特に賑わう）", access:"白浜駅からバスで約10分",
+    photo:"https://source.unsplash.com/800x400/?shirahama,wakayama,beach", url:"https://www.nankishirahama.jp/" },
+  { name:"湯の峰温泉", region:"近畿", lat:33.873, lng:135.748,
+    desc:"熊野古道を歩いた参拝者が入浴した日本最古の温泉（1800年以上の歴史）。世界遺産に登録された温泉「つぼ湯」は1日6回湯の色が変わる神秘の湯。",
+    quality:"含硫黄ナトリウム炭酸水素塩泉", effect:"疲労回復・神経痛・皮膚病・慢性消化器病",
+    season:"通年", access:"新宮駅からバスで約70分",
+    photo:"https://source.unsplash.com/800x400/?yunomine,kumano,onsen", url:"https://www.wakayama-kanko.or.jp/" },
+  { name:"川湯温泉", region:"近畿", lat:33.817, lng:135.775,
+    desc:"大塔川の川底から温泉が自噴する珍しい温泉地。冬には川をせき止めて作る「仙人風呂」（長さ約50m）が有名な大露天風呂になる。",
+    quality:"炭酸水素塩泉（重曹泉）", effect:"疲労回復・神経痛・慢性皮膚病・美肌",
+    season:"通年（仙人風呂は12〜2月）", access:"新宮駅からバスで約90分",
+    photo:"https://source.unsplash.com/800x400/?kawayu,wakayama,river", url:"https://www.wakayama-kanko.or.jp/" },
+  { name:"南紀勝浦温泉", region:"近畿", lat:33.618, lng:135.949,
+    desc:"太平洋を望む温泉地。マグロの水揚げで有名な那智勝浦の港町で、世界遺産「那智の滝」にも近い。洞窟風呂が特徴的な忘帰洞が有名。",
+    quality:"塩化物泉（ナトリウム塩化物泉）", effect:"疲労回復・冷え性・神経痛・慢性皮膚病",
+    season:"通年", access:"紀伊勝浦駅から徒歩・船",
+    photo:"https://source.unsplash.com/800x400/?katsuura,wakayama,pacific", url:"https://www.wakayama-kanko.or.jp/" },
+  { name:"湯村温泉（兵庫）", region:"近畿", lat:35.544, lng:134.407,
+    desc:"98℃の高温の湯が湧き出る「荒湯」で卵や野菜を茹でる文化が有名。山陰の松本清張ゆかりの地で、ドラマ「夢千代日記」の舞台。",
+    quality:"含重炭酸食塩泉", effect:"疲労回復・神経痛・慢性胃腸病・婦人病",
+    season:"通年", access:"浜坂駅からバスで約20分",
+    photo:"https://source.unsplash.com/800x400/?yumura,hyogo,onsen", url:"https://www.hyogo-tourism.jp/" },
+  { name:"龍神温泉", region:"近畿", lat:33.959, lng:135.646,
+    desc:"日本三美人の湯のひとつ。高野龍神スカイライン沿いに湧き、アルカリ性が強く美肌効果で有名。深山幽谷の静寂の中で楽しむ秘湯の雰囲気。",
+    quality:"単純温泉（アルカリ性）", effect:"美肌・疲労回復・神経痛・冷え性",
+    season:"通年（紅葉の秋が絶景）", access:"橋本駅から車で約80分",
+    photo:"https://source.unsplash.com/800x400/?ryujin,wakayama,japan", url:"https://www.wakayama-kanko.or.jp/" },
+  { name:"洲本温泉", region:"近畿", lat:34.340, lng:134.894,
+    desc:"淡路島南部の温泉リゾート。鳴門海峡を望む絶景と、淡路島特産のタマネギや鳴門鯛など海の幸を楽しめる。",
+    quality:"塩化物泉", effect:"疲労回復・神経痛・冷え性",
+    season:"通年", access:"洲本バスセンターからバス・タクシー",
+    photo:"https://source.unsplash.com/800x400/?sumoto,awajishima,japan", url:"https://www.city.sumoto.lg.jp/" },
+  { name:"天橋立温泉", region:"近畿", lat:35.575, lng:135.182,
+    desc:"日本三景のひとつ「天橋立」を望む京都府の温泉地。砂州が日本海に延びる天橋立の絶景を、温泉宿から眺める贅沢な体験。",
+    quality:"塩化物泉（ナトリウム・カルシウム塩化物泉）", effect:"疲労回復・神経痛・慢性皮膚病・美肌",
+    season:"通年（松並木の紅葉が美しい秋）", access:"天橋立駅から徒歩すぐ",
+    photo:"https://source.unsplash.com/800x400/?amanohashidate,kyoto,japan", url:"https://www.kyoto-kankou.or.jp/" },
+
+  // 中国 (8)
+  { name:"皆生温泉", region:"中国", lat:35.490, lng:133.327,
+    desc:"日本海を望む鳥取県最大の温泉リゾート。源泉が日本海の海底から湧き出るという珍しい温泉で、大山の絶景と新鮮な境港の海の幸が魅力。",
+    quality:"塩化物泉（ナトリウム・カルシウム塩化物泉）", effect:"疲労回復・神経痛・冷え性・慢性皮膚病",
+    season:"通年", access:"米子駅からバスで約15分",
+    photo:"https://source.unsplash.com/800x400/?kaike,tottori,sea", url:"https://www.kaike-onsen.com/" },
+  { name:"三朝温泉", region:"中国", lat:35.422, lng:133.833,
+    desc:"世界有数のラジウム温泉。ラドン含有量は世界屈指で、飲泉・吸入も行われる。三徳山三佛寺（投入堂）への登山起点でもある。",
+    quality:"放射能泉（ラジウム泉）", effect:"痛風・神経痛・慢性婦人病・関節炎",
+    season:"通年", access:"倉吉駅からバスで約20分",
+    photo:"https://source.unsplash.com/800x400/?misasa,tottori,onsen", url:"https://www.tottori-guide.jp/" },
+  { name:"湯原温泉", region:"中国", lat:35.175, lng:133.540,
+    desc:"日本三大露天風呂「砂湯」で有名な岡山の秘湯。旭川の清流沿いに無料の混浴露天風呂があり、四季折々の自然美と共に湯を楽しめる。",
+    quality:"アルカリ性単純温泉", effect:"美肌・疲労回復・神経痛・慢性皮膚病",
+    season:"通年（紅葉シーズンが特に美しい）", access:"湯原IC近く、津山駅から車で約40分",
+    photo:"https://source.unsplash.com/800x400/?yubara,okayama,river", url:"https://yubara.com/" },
+  { name:"奥津温泉", region:"中国", lat:35.147, lng:133.698,
+    desc:"岡山県の山中に湧く湯治の名湯。川沿いの岩盤から足踏み洗濯をする「足踏み洗濯」の文化が今も伝わる日本の原風景。",
+    quality:"アルカリ性単純温泉", effect:"美肌・疲労回復・神経痛",
+    season:"通年", access:"津山駅から車で約50分",
+    photo:"https://source.unsplash.com/800x400/?okutsu,okayama,valley", url:"https://www.okayama-kanko.jp/" },
+  { name:"湯田温泉", region:"中国", lat:34.173, lng:131.459,
+    desc:"山口市内に湧く山陰の名湯。中原中也の故郷で、白狐伝説が残る温泉地。山口の観光拠点として市街地にある便利さも魅力。",
+    quality:"アルカリ性単純温泉", effect:"美肌・疲労回復・神経痛・慢性消化器病",
+    season:"通年", access:"山口駅から徒歩約15分",
+    photo:"https://source.unsplash.com/800x400/?yuda,yamaguchi,japan", url:"https://www.yuda-onsen.jp/" },
+  { name:"長門湯本温泉", region:"中国", lat:34.380, lng:131.218,
+    desc:"山口県随一の温泉地。音信川沿いに旅館が並ぶ情緒ある温泉街は、2019年に大規模なリニューアルを経て注目度が急上昇中。",
+    quality:"アルカリ性単純温泉", effect:"美肌・疲労回復・神経痛",
+    season:"通年", access:"長門湯本駅から徒歩すぐ",
+    photo:"https://source.unsplash.com/800x400/?nagato,yamaguchi,onsen", url:"https://yamaguchi-tourism.jp/" },
+  { name:"玉造温泉", region:"中国", lat:35.408, lng:133.007,
+    desc:"「出雲国風土記」にも記された山陰最古の温泉。「肌に三日浸かれば七白になる」と称されるほどの美肌効果で、古来より「縁結びの神様」出雲大社とセットで訪れる旅人が多い。",
+    quality:"アルカリ性単純温泉", effect:"美肌・疲労回復・神経痛・慢性婦人病",
+    season:"通年", access:"玉造温泉駅から徒歩約10分",
+    photo:"https://source.unsplash.com/800x400/?tamatsukuri,shimane,japan", url:"https://www.kankou-shimane.com/" },
+  { name:"湯郷温泉", region:"中国", lat:35.087, lng:134.103,
+    desc:"「美作三湯」のひとつ。白鷺が傷を癒しているのを発見したという白鷺伝説の湯。スポーツ合宿地としても知られ、女子サッカーのメッカ。",
+    quality:"塩化物泉・炭酸水素塩泉", effect:"疲労回復・神経痛・慢性皮膚病・婦人病",
+    season:"通年", access:"美作市駅から車で約15分",
+    photo:"https://source.unsplash.com/800x400/?yubago,okayama,japan", url:"https://www.okayama-kanko.jp/" },
+
+  // 四国 (5)
+  { name:"道後温泉", region:"四国", lat:33.851, lng:132.788,
+    desc:"日本最古の温泉のひとつ。夏目漱石「坊っちゃん」の舞台で、明治時代築の本館「道後温泉本館」は国指定重要文化財。温泉の象徴的存在。",
+    quality:"アルカリ性単純温泉", effect:"疲労回復・神経痛・慢性消化器病・美肌",
+    season:"通年", access:"松山駅から市電で約20分",
+    photo:"https://source.unsplash.com/800x400/?dogo,matsuyama,onsen", url:"https://dogo.jp/" },
+  { name:"こんぴら温泉", region:"四国", lat:34.217, lng:133.817,
+    desc:"四国随一のパワースポット「金刀比羅宮（こんぴらさん）」の門前町に湧く温泉。1368段の石段参拝の後に楽しむ温泉は格別。",
+    quality:"塩化物泉（ナトリウム塩化物泉）", effect:"疲労回復・神経痛・冷え性",
+    season:"通年", access:"琴平駅から徒歩すぐ",
+    photo:"https://source.unsplash.com/800x400/?konpira,kagawa,shrine", url:"https://www.my-kagawa.jp/" },
+  { name:"祖谷温泉", region:"四国", lat:33.871, lng:133.860,
+    desc:"日本三大秘境のひとつ「祖谷渓」に湧く秘湯。断崖絶壁の渓谷美と平家の落人伝説が残るロマンある温泉地。ケーブルカーで降りる露天風呂が絶景。",
+    quality:"アルカリ性単純温泉", effect:"美肌・疲労回復・神経痛",
+    season:"通年（紅葉の秋が絶景）", access:"大歩危駅から車で約30分",
+    photo:"https://source.unsplash.com/800x400/?iya,tokushima,valley", url:"https://www.awanavi.jp/" },
+  { name:"鳴門温泉", region:"四国", lat:34.175, lng:134.607,
+    desc:"世界三大潮流「鳴門の渦潮」に近い温泉地。海を望む露天風呂から渦潮を眺めることができる宿もあり、四国と淡路島を結ぶ観光拠点。",
+    quality:"塩化物泉", effect:"疲労回復・神経痛・冷え性",
+    season:"通年（渦潮の大潮時が見ごろ）", access:"鳴門駅からバスで約15分",
+    photo:"https://source.unsplash.com/800x400/?naruto,tokushima,whirlpool", url:"https://www.city.naruto.tokushima.jp/" },
+  { name:"足摺温泉", region:"四国", lat:32.724, lng:133.001,
+    desc:"四国の最南端、土佐清水市の足摺岬に湧く温泉。黒潮の大海原を望む絶景の露天風呂と、坂本龍馬ゆかりの幕末ロマンが漂う温泉地。",
+    quality:"塩化物泉", effect:"疲労回復・冷え性・神経痛",
+    season:"通年（ホエールウォッチングは4〜9月）", access:"土佐清水駅から車で約40分",
+    photo:"https://source.unsplash.com/800x400/?ashizuri,kochi,cape", url:"https://www.ashizuri.com/" },
+
+  // 九州・沖縄 (23)
+  { name:"別府温泉", region:"九州・沖縄", lat:33.284, lng:131.496,
+    desc:"「地獄めぐり」で有名な日本最大の温泉地。湧出量・源泉数ともに日本一を誇り、「血の池地獄」など個性豊かな地獄が8つ点在する。",
+    quality:"塩化物泉・炭酸水素塩泉・硫酸塩泉ほか多数", effect:"神経痛・リウマチ・疲労回復・慢性皮膚病",
+    season:"通年", access:"別府駅から徒歩・バス",
+    photo:"https://source.unsplash.com/800x400/?beppu,oita,onsen,hell", url:"https://www.city.beppu.oita.jp/" },
+  { name:"由布院温泉", region:"九州・沖縄", lat:33.257, lng:131.369,
+    desc:"由布岳を仰ぐ九州随一の人気温泉リゾート。こじんまりした雑貨店やカフェが並ぶ湯の坪街道と、朝霧立ち込める金鱗湖が風情満点。",
+    quality:"単純温泉・炭酸水素塩泉", effect:"疲労回復・神経痛・慢性消化器病・美肌",
+    season:"通年（朝霧の秋が特に幻想的）", access:"由布院駅から徒歩すぐ",
+    photo:"https://source.unsplash.com/800x400/?yufuin,oita,lake,fog", url:"https://www.yufuin.gr.jp/" },
+  { name:"黒川温泉", region:"九州・沖縄", lat:33.085, lng:131.107,
+    desc:"「入湯手形」での露天風呂めぐりが人気の熊本の秘湯。山里に溶け込んだ旅館と、木立に囲まれた野趣溢れる露天風呂が全国的に評判。",
+    quality:"硫酸塩泉・塩化物泉", effect:"疲労回復・神経痛・リウマチ・慢性皮膚病",
+    season:"通年（紅葉の秋・雪見の冬が人気）", access:"阿蘇駅から車で約40分",
+    photo:"https://source.unsplash.com/800x400/?kurokawa,kumamoto,onsen", url:"https://www.kurokawaonsen.or.jp/" },
+  { name:"嬉野温泉", region:"九州・沖縄", lat:33.098, lng:129.984,
+    desc:"「日本三大美肌の湯」のひとつ。重曹成分が豊富なトロトロの湯は肌がつるつるになると評判。佐賀県産の嬉野茶と豆腐料理も名産。",
+    quality:"重曹泉（炭酸水素ナトリウム泉）", effect:"美肌・疲労回復・神経痛・慢性消化器病",
+    season:"通年", access:"嬉野温泉駅から徒歩・バス",
+    photo:"https://source.unsplash.com/800x400/?ureshino,saga,onsen", url:"https://www.asobo-saga.jp/" },
+  { name:"武雄温泉", region:"九州・沖縄", lat:33.194, lng:130.024,
+    desc:"1300年の歴史を持つ佐賀の名湯。シーボルトも入浴した古湯で、朱塗りの楼門は国指定重要文化財。蔦屋書店が併設された文化施設でも有名。",
+    quality:"炭酸水素塩泉・塩化物泉", effect:"疲労回復・神経痛・慢性皮膚病・美肌",
+    season:"通年", access:"武雄温泉駅から徒歩約5分",
+    photo:"https://source.unsplash.com/800x400/?takeo,saga,onsen", url:"https://www.takeo-kk.net/" },
+  { name:"雲仙温泉", region:"九州・沖縄", lat:32.720, lng:130.258,
+    desc:"長崎県島原半島の雲仙岳に湧く硫黄温泉。日本初の国立公園に指定されたエリアで、白煙立ち上る「雲仙地獄」の景観が幻想的。",
+    quality:"酸性硫酸塩泉", effect:"神経痛・リウマチ・皮膚病・慢性婦人病",
+    season:"通年（ウニョウニョとした霧の秋が神秘的）", access:"諫早駅からバスで約90分",
+    photo:"https://source.unsplash.com/800x400/?unzen,nagasaki,volcano", url:"https://www.unzen.org/" },
+  { name:"指宿温泉", region:"九州・沖縄", lat:31.252, lng:130.629,
+    desc:"世界的にも珍しい「砂むし温泉」で有名。温泉で熱された砂に体を埋める独特の入浴法は、全身の毛穴から温泉成分が吸収され、発汗効果が抜群。",
+    quality:"塩化物泉（ナトリウム塩化物泉）", effect:"疲労回復・神経痛・冷え性・消化器病",
+    season:"通年", access:"指宿駅から徒歩約10分",
+    photo:"https://source.unsplash.com/800x400/?ibusuki,kagoshima,sand,bath", url:"https://www.ibusuki.or.jp/" },
+  { name:"霧島温泉郷", region:"九州・沖縄", lat:31.902, lng:130.863,
+    desc:"霧島連山の麓に湧く複数の温泉地の総称。坂本龍馬が新婚旅行で訪れた温泉として有名で、霧島神宮への参拝と組み合わせるのが定番。",
+    quality:"硫酸塩泉・炭酸水素塩泉・硫黄泉（泉地により異なる）", effect:"神経痛・リウマチ・疲労回復・美肌",
+    season:"通年（ミヤマキリシマの5〜6月が特に美しい）", access:"鹿児島中央駅からバスで約90分",
+    photo:"https://source.unsplash.com/800x400/?kirishima,kagoshima,volcano", url:"https://www.kagoshima-kankou.com/" },
+  { name:"人吉温泉", region:"九州・沖縄", lat:32.212, lng:130.767,
+    desc:"球磨川沿いに旅館が並ぶ熊本の名湯。日本三急流「球磨川」でのラフティングと温泉を楽しめ、相良700年の歴史と城下町の風情が魅力。",
+    quality:"塩化物泉・炭酸水素塩泉", effect:"疲労回復・神経痛・慢性消化器病・冷え性",
+    season:"通年（球磨川下りは4〜10月）", access:"人吉駅から徒歩すぐ",
+    photo:"https://source.unsplash.com/800x400/?hitoyoshi,kumamoto,river", url:"https://kumamoto.guide/" },
+  { name:"小浜温泉", region:"九州・沖縄", lat:32.724, lng:130.212,
+    desc:"雲仙半島の付け根に位置し、日本一長い「ほっとふっと105」（全長105mの足湯）が有名。橘湾に沈む夕日を望む絶景露天風呂が人気。",
+    quality:"塩化物泉（ナトリウム塩化物泉）", effect:"疲労回復・神経痛・冷え性",
+    season:"通年", access:"諫早駅からバスで約60分",
+    photo:"https://source.unsplash.com/800x400/?obama,nagasaki,sunset", url:"https://www.nagasaki-tabinet.com/" },
+  { name:"長湯温泉", region:"九州・沖縄", lat:33.012, lng:131.261,
+    desc:"世界有数の炭酸濃度を誇る「日本一の炭酸泉」。飲泉もでき、心臓・血管への効果が科学的に証明されている医療湯治の温泉。「ラムネの湯」の愛称も。",
+    quality:"炭酸水素塩泉（高濃度炭酸泉）", effect:"高血圧・動脈硬化・心臓病・疲労回復",
+    season:"通年", access:"竹田駅から車で約20分",
+    photo:"https://source.unsplash.com/800x400/?nagayu,oita,river", url:"https://www.visit-oita.jp/" },
+  { name:"山鹿温泉", region:"九州・沖縄", lat:33.011, lng:130.685,
+    desc:"熊本の商都に湧く温泉。八千代座など歴史的建造物と温泉が融合した「湯の町」で、山鹿灯籠祭りは全国的に有名な夏の祭典。",
+    quality:"アルカリ性単純温泉", effect:"美肌・疲労回復・神経痛・冷え性",
+    season:"通年（灯籠祭りの8月が特に賑わう）", access:"博多駅からバスで約90分",
+    photo:"https://source.unsplash.com/800x400/?yamaga,kumamoto,japan", url:"https://kumamoto.guide/" },
+  { name:"平山温泉", region:"九州・沖縄", lat:32.901, lng:130.726,
+    desc:"熊本の山里に湧く「肌に優しいトロトロの湯」で知られる知る人ぞ知る名湯。pH9.5以上の高アルカリ性で「温泉ソムリエ」に人気の美肌の湯。",
+    quality:"アルカリ性単純温泉（高pH）", effect:"美肌・疲労回復・神経痛・慢性皮膚病",
+    season:"通年", access:"新玉名駅から車で約20分",
+    photo:"https://source.unsplash.com/800x400/?hirayama,kumamoto,japan", url:"https://www.hirayama-onsen.jp/" },
+  { name:"菊池温泉", region:"九州・沖縄", lat:32.989, lng:130.806,
+    desc:"菊池渓谷の清流近くに湧く熊本の温泉。青々とした菊池渓谷の滝めぐりと組み合わせた自然体験と温泉は最高の組み合わせ。",
+    quality:"アルカリ性単純温泉", effect:"美肌・疲労回復・神経痛",
+    season:"通年（渓谷の新緑が美しい5〜6月）", access:"熊本駅からバスで約75分",
+    photo:"https://source.unsplash.com/800x400/?kikuchi,kumamoto,valley", url:"https://kumamoto.guide/" },
+  { name:"えびの高原温泉", region:"九州・沖縄", lat:31.947, lng:130.817,
+    desc:"霧島山系の中でも最も高所にある標高1,200mの高原温泉。白鳥山の噴気を間近に見ながら入る露天風呂は非日常的な体験。",
+    quality:"酸性硫黄泉", effect:"神経痛・慢性皮膚病・疲労回復・リウマチ",
+    season:"通年（ノカイドウ（幻の桜）の4月）", access:"えびのIC近く、宮崎空港から車で約90分",
+    photo:"https://source.unsplash.com/800x400/?ebino,miyazaki,highland", url:"https://www.kanko-miyazaki.jp/" },
+  { name:"日南青島温泉", region:"九州・沖縄", lat:31.600, lng:131.472,
+    desc:"亜熱帯植物が自生する「青島」の近くに湧く宮崎の温泉。太平洋を望む露天風呂と、日本の渚100選「青島海岸」でのサーフィンを楽しめるリゾート。",
+    quality:"塩化物泉（ナトリウム塩化物泉）", effect:"疲労回復・冷え性・神経痛",
+    season:"通年（サーフィンは秋冬の波が良い）", access:"青島駅から徒歩すぐ",
+    photo:"https://source.unsplash.com/800x400/?aoshima,miyazaki,tropical", url:"https://www.miyazaki-city.tourism.or.jp/" },
+  { name:"西表島温泉", region:"九州・沖縄", lat:24.325, lng:123.796,
+    desc:"日本最南西端に位置する沖縄・西表島の秘湯。亜熱帯のジャングルに囲まれた野趣溢れる温泉で、イリオモテヤマネコの生息地でもある。",
+    quality:"塩化物泉（ナトリウム塩化物泉）", effect:"疲労回復・神経痛・冷え性・慢性皮膚病",
+    season:"通年（ダイビングは4〜11月が最適）", access:"石垣島からフェリーで約40〜60分",
+    photo:"https://source.unsplash.com/800x400/?iriomote,okinawa,jungle", url:"https://www.town.taketomi.lg.jp/" },
+  { name:"壁湯温泉", region:"九州・沖縄", lat:33.213, lng:131.186,
+    desc:"大分県九重町の渓流沿いに湧く天然の露天風呂。岩をくり抜いた洞窟状の浴槽に湯が湛えられ、渓谷の川音を聞きながら入浴できる秘湯。",
+    quality:"炭酸水素塩泉（単純炭酸水素塩泉）", effect:"疲労回復・神経痛・美肌",
+    season:"通年（冬の雪見露天が人気）", access:"玖珠ICから車で約30分",
+    photo:"https://source.unsplash.com/800x400/?kabeyu,oita,onsen", url:"https://www.visit-oita.jp/" },
+  { name:"湯平温泉", region:"九州・沖縄", lat:33.218, lng:131.366,
+    desc:"石畳の坂道と昭和レトロな温泉宿が情緒豊かな大分の秘湯。江戸時代から続く湯治文化が残り、旅情を誘う静かな山の温泉地。",
+    quality:"塩化物泉（ナトリウム塩化物泉）", effect:"疲労回復・神経痛・慢性胃腸病・婦人病",
+    season:"通年", access:"由布院駅から車で約20分",
+    photo:"https://source.unsplash.com/800x400/?yuhira,oita,onsen", url:"https://www.visit-oita.jp/" },
+  { name:"天ヶ瀬温泉", region:"九州・沖縄", lat:33.260, lng:131.270,
+    desc:"玖珠川の渓谷に湧き出る温泉。川岸の岩盤から自噴する「河原湯」が有名で、川沿いに露天風呂が点在する野趣溢れる温泉地。",
+    quality:"塩化物泉・炭酸水素塩泉", effect:"疲労回復・神経痛・慢性婦人病",
+    season:"通年（紅葉の秋が特に美しい）", access:"天ヶ瀬駅から徒歩約5分",
+    photo:"https://source.unsplash.com/800x400/?amagase,oita,river", url:"https://www.visit-oita.jp/" },
+  { name:"地獄温泉（阿蘇）", region:"九州・沖縄", lat:32.856, lng:131.011,
+    desc:"阿蘇山麓の深山に湧く湯治の秘湯。明治時代から続く「すずめの湯」は灰色の泥を含む硫黄泉で、2016年の熊本地震から復活した不屈の名湯。",
+    quality:"酸性硫黄泉", effect:"神経痛・リウマチ・慢性皮膚病・疲労回復",
+    season:"通年", access:"阿蘇駅から車で約30分",
+    photo:"https://source.unsplash.com/800x400/?jigoku,aso,kumamoto,onsen", url:"https://jigoku-onsen.co.jp/" },
+  { name:"筋湯温泉", region:"九州・沖縄", lat:33.174, lng:131.130,
+    desc:"九重連山の九酔渓近くに湧く高原温泉。打たせ湯の数が日本一多いことで有名で、力強い打たせ湯は肩こり・腰痛に絶大な効果。",
+    quality:"炭酸水素塩泉（単純温泉）", effect:"肩こり・腰痛・疲労回復・神経痛",
+    season:"通年（九重「夢」吊橋との組み合わせが人気）", access:"九重ICから車で約20分",
+    photo:"https://source.unsplash.com/800x400/?sujiyu,oita,highlands", url:"https://www.visit-oita.jp/" },
+  { name:"国頭温泉（沖縄）", region:"九州・沖縄", lat:26.715, lng:128.194,
+    desc:"沖縄本島最北端のやんばる（山原）に湧く沖縄唯一の天然温泉。ヤンバルクイナの生息地に近い豊かな亜熱帯の自然と、温泉のコントラストが珍しい。",
+    quality:"塩化物泉", effect:"疲労回復・冷え性・神経痛",
+    season:"通年", access:"那覇空港から車で約2時間",
+    photo:"https://source.unsplash.com/800x400/?okinawa,forest,nature", url:"https://www.okinawastory.jp/" }
+];
+
+/* Legacy application retained for reference; superseded below.
+// init localStorage
+let visited = new Set(JSON.parse(localStorage.getItem('japanOnsenVisited') || '[]'));
+let currentSpotName = null;
+const markerMap = {};
+
+// init map
+const map = L.map('map', { center:[36.5, 136], zoom:5 });
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution:'© OpenStreetMap contributors', maxZoom:19
+}).addTo(map);
+
+// region filter buttons
+const regions = ['すべて', ...Object.keys(REGION_COLORS)];
+const filterDiv = document.getElementById('regionFilters');
+let activeRegion = 'すべて';
+regions.forEach(r => {
+  const btn = document.createElement('button');
+  btn.className = 'region-btn' + (r === 'すべて' ? ' all-btn active' : '');
+  btn.textContent = r;
+  btn.style.background = r === 'すべて' ? '#7a3c0a' : REGION_COLORS[r];
+  btn.onclick = () => {
+    document.querySelectorAll('.region-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    activeRegion = r;
+    filterMarkers(r);
+  };
+  filterDiv.appendChild(btn);
+});
+
+function filterMarkers(region) {
+  onsen.forEach(s => {
+    const m = markerMap[s.name];
+    if (!m) return;
+    if (region === 'すべて' || s.region === region) {
+      m.addTo(map);
+    } else {
+      map.removeLayer(m);
+    }
+  });
+}
+
+function createMarkerIcon(spot, isVisited) {
+  const color = REGION_COLORS[spot.region] || '#c45e1a';
+  return L.divIcon({
+    className:'',
+    html:`<div class="custom-marker${isVisited?' visited':''}" style="background:${color}"></div>`,
+    iconSize:[28,28], iconAnchor:[14,28], popupAnchor:[0,-30]
+  });
+}
+
+// add markers
+onsen.forEach(spot => {
+  const isVis = visited.has(spot.name);
+  const marker = L.marker([spot.lat, spot.lng], { icon: createMarkerIcon(spot, isVis) })
+    .addTo(map)
+    .bindTooltip(spot.name, { direction:'top', offset:[0,-28] });
+  marker.on('click', () => openPanel(spot, marker));
+  markerMap[spot.name] = marker;
+});
+
+function applyMarkerVisited(name, isVisited) {
+  const m = markerMap[name];
+  if (!m) return;
+  const spot = onsen.find(s => s.name === name);
+  m.setIcon(createMarkerIcon(spot, isVisited));
+}
+
+function updateCounter() {
+  const total = onsen.length;
+  const v = visited.size;
+  document.getElementById('visitedCount').textContent = v;
+  document.getElementById('remainingCount').textContent = total - v;
+  const pct = Math.round(v / total * 100);
+  document.getElementById('progressBar').style.width = pct + '%';
+  document.getElementById('progressLabel').textContent = v + ' / ' + total + ' 達成';
+}
+
+function updateVisitBtn(name) {
+  const isVis = visited.has(name);
+  const btn = document.getElementById('visitBtn');
+  document.getElementById('visitBtnIcon').textContent = isVis ? '☑' : '☐';
+  document.getElementById('visitBtnText').textContent = isVis ? '訪問済み（クリックで解除）' : '訪問済みにする';
+  btn.className = 'visit-btn' + (isVis ? ' visited' : '');
+}
+
+function openPanel(spot, marker) {
+  currentSpotName = spot.name;
+  document.getElementById('panelPhoto').src = spot.photo;
+  document.getElementById('panelName').textContent = spot.name;
+  const badge = document.getElementById('panelBadge');
+  badge.textContent = spot.region;
+  badge.style.background = REGION_COLORS[spot.region] || '#c45e1a';
+  document.getElementById('panelDesc').textContent = spot.desc;
+  document.getElementById('panelQuality').textContent = spot.quality;
+  document.getElementById('panelEffect').textContent = spot.effect;
+  document.getElementById('panelSeason').textContent = spot.season;
+  document.getElementById('panelAccess').textContent = spot.access;
+  const urlDiv = document.getElementById('panelUrl');
+  urlDiv.innerHTML = spot.url
+    ? `<a href="${spot.url}" target="_blank">🔗 公式サイトを見る</a>`
+    : '';
+  updateVisitBtn(spot.name);
+  document.getElementById('panel').classList.add('open');
+}
+
+function closePanel() {
+  document.getElementById('panel').classList.remove('open');
+  currentSpotName = null;
+}
+
+function toggleVisited() {
+  if (!currentSpotName) return;
+  if (visited.has(currentSpotName)) {
+    visited.delete(currentSpotName);
+    applyMarkerVisited(currentSpotName, false);
+  } else {
+    visited.add(currentSpotName);
+    applyMarkerVisited(currentSpotName, true);
+  }
+  localStorage.setItem('japanOnsenVisited', JSON.stringify([...visited]));
+  updateVisitBtn(currentSpotName);
+  updateCounter();
+}
+
+// init visited state
+setTimeout(() => {
+  visited.forEach(name => applyMarkerVisited(name, true));
+  updateCounter();
+}, 100);
+*/
+</script>
+<script>
+const $=id=>document.getElementById(id);
+const safeJSON=(key,fallback)=>{try{return JSON.parse(localStorage.getItem(key))??fallback}catch{return fallback}};
+const persist=(key,value)=>localStorage.setItem(key,JSON.stringify(value));
+const TOTAL=onsen.length;
+let visited=new Set(safeJSON('japanOnsenVisited',[])),wishes=new Set(safeJSON('japanOnsenWishes',[])),tripPlan=safeJSON('japanOnsenPlan',[]),notes=safeJSON('japanOnsenNotes',{}),userPhotos=safeJSON('japanOnsenPhotos',{});
+let currentSpotName=null,currentRegion='',userPosition=null,filteredSpots=[...onsen],currentTab='wishes',selectedMarkerEl=null;
+onsen.forEach((s,i)=>s.id=i);
+const map=L.map('map',{center:[36.5,136],zoom:5});
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',maxZoom:18}).addTo(map);
+const markerLayer=L.layerGroup().addTo(map);let userMarker=null;
+function currentSeason(){const m=new Date().getMonth()+1;return m<=2||m===12?'冬':m<=5?'春':m<=8?'夏':'秋'}
+function isInSeason(s){const v=s.season,m=new Date().getMonth()+1,rx={春:/春|桜|3月|4月|5月/,夏:/夏|6月|7月|8月/,秋:/秋|紅葉|9月|10月|11月/,冬:/冬|雪|氷|12月|1月|2月/};return /通年/.test(v)||rx[currentSeason()].test(v)||new RegExp(`${m}月`).test(v)}
+function accessType(s){const a=s.access;if(/徒歩/.test(a))return'walk';if(/駅|バス|電車|フェリー|空港/.test(a))return'train';return'car'}
+function distanceKm(a,b){const r=6371,d=Math.PI/180,d1=(b.lat-a.lat)*d,d2=(b.lng-a.lng)*d,q=Math.sin(d1/2)**2+Math.cos(a.lat*d)*Math.cos(b.lat*d)*Math.sin(d2/2)**2;return 2*r*Math.asin(Math.sqrt(q))}
+function spotByName(n){return onsen.find(s=>s.name===n)}
+function esc(s=''){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function toast(message){const el=$('toast');el.textContent=message;el.classList.add('show');clearTimeout(toast.t);toast.t=setTimeout(()=>el.classList.remove('show'),2200)}
+
+const regions=[...new Set(onsen.map(s=>s.region))],regionBox=$('regionFilters');
+function addRegionButton(label,value){const b=document.createElement('button');b.className='region-btn'+(value?'':' all-btn')+(value===''?' active':'');b.textContent=label;b.dataset.region=value;b.style.background=value?(REGION_COLORS[value]||'#7a3c0a'):'';b.onclick=()=>{currentRegion=value;document.querySelectorAll('.region-btn').forEach(x=>x.classList.toggle('active',x===b));applyFilters()};regionBox.appendChild(b)}
+addRegionButton('すべて','');regions.forEach(r=>addRegionButton(r,r));$('legend').innerHTML=regions.map(r=>`<div class="legend-row"><i class="legend-dot" style="background:${REGION_COLORS[r]}"></i>${esc(r)}</div>`).join('');
+
+function applyFilters(){const q=$('searchInput').value.trim().toLowerCase(),quality=$('qualityFilter').value,effect=$('effectFilter').value,season=$('seasonFilter').value,access=$('accessFilter').value;filteredSpots=onsen.filter(s=>{const hay=`${s.name} ${s.region} ${s.desc} ${s.quality} ${s.effect} ${s.season} ${s.access}`.toLowerCase();return(!currentRegion||s.region===currentRegion)&&(!q||hay.includes(q))&&(!quality||s.quality.includes(quality))&&(!effect||s.effect.includes(effect))&&(!season||(season==='通年'?s.season.includes('通年'):(season===currentSeason()?isInSeason(s):s.season.includes(season))))&&(!access||accessType(s)===access)&&(!$('wishOnly').checked||wishes.has(s.name))&&(!$('unvisitedOnly').checked||!visited.has(s.name))&&(!$('nowOnly').checked||isInSeason(s))});const sort=$('sortFilter').value;if(sort==='distance'&&userPosition)filteredSpots.sort((a,b)=>distanceKm(userPosition,a)-distanceKm(userPosition,b));if(sort==='season')filteredSpots.sort((a,b)=>Number(isInSeason(b))-Number(isInSeason(a)));if(sort==='name')filteredSpots.sort((a,b)=>a.name.localeCompare(b.name,'ja'));$('resultCount').textContent=`${filteredSpots.length} / ${TOTAL}件`;renderMarkers();renderList();closePanel()}
+function renderMarkers(){markerLayer.clearLayers();const zoom=map.getZoom(),cell=zoom<=5?3.2:zoom===6?1.5:0;if(cell){const groups=new Map();filteredSpots.forEach(s=>{const k=`${Math.round(s.lat/cell)},${Math.round(s.lng/cell)}`;if(!groups.has(k))groups.set(k,[]);groups.get(k).push(s)});groups.forEach(group=>{if(group.length===1)return addSpotMarker(group[0]);const lat=group.reduce((a,s)=>a+s.lat,0)/group.length,lng=group.reduce((a,s)=>a+s.lng,0)/group.length,size=Math.min(48,30+group.length),icon=L.divIcon({className:'cluster-marker',html:String(group.length),iconSize:[size,size],iconAnchor:[size/2,size/2]});L.marker([lat,lng],{icon,title:`${group.length}温泉`}).on('click',()=>map.setView([lat,lng],zoom+2)).addTo(markerLayer)})}else filteredSpots.forEach(addSpotMarker)}
+function addSpotMarker(s){const color=visited.has(s.name)?'#c45e1a':(REGION_COLORS[s.region]||'#7a3c0a'),icon=L.divIcon({className:'',html:`<div class="custom-marker${visited.has(s.name)?' visited':''}" style="background:${color}" aria-label="${esc(s.name)}"></div>`,iconSize:[28,28],iconAnchor:[14,28]});L.marker([s.lat,s.lng],{icon,title:s.name}).on('click',function(){openPanel(s,this)}).addTo(markerLayer)}
+map.on('zoomend',renderMarkers);
+function renderList(){const list=$('spotList');list.innerHTML=filteredSpots.map(s=>{const d=userPosition?`${Math.round(distanceKm(userPosition,s))}km`:'',badges=[isInSeason(s)?'今の季節向き':'',s.quality.split(/[・（(]/)[0]].filter(Boolean);return`<button class="spot-card" data-spot="${s.id}"><h3>${esc(s.name)}</h3><span class="fav">${wishes.has(s.name)?'♥':'♡'}</span><p>${esc(s.region)}${d?`・${d}`:''}<br>${esc(s.desc)}</p><span class="mini-tags">${badges.map(x=>`<i class="tag">${esc(x)}</i>`).join('')}</span></button>`}).join('')||'<p style="padding:20px;color:#777">条件に合う温泉がありません。</p>';list.querySelectorAll('[data-spot]').forEach(b=>b.onclick=()=>{const s=onsen[+b.dataset.spot];map.setView([s.lat,s.lng],9);$('listPanel').classList.remove('open');$('listToggle').setAttribute('aria-expanded','false');setTimeout(()=>openPanel(s,null),100)})}
+let searchTimer;$('searchInput').oninput=()=>{clearTimeout(searchTimer);searchTimer=setTimeout(applyFilters,180)};$('clearSearch').onclick=()=>{$('searchInput').value='';applyFilters();$('searchInput').focus()};['qualityFilter','effectFilter','seasonFilter','accessFilter','sortFilter','wishOnly','unvisitedOnly','nowOnly'].forEach(id=>$(id).onchange=applyFilters);$('advancedToggle').onclick=()=>{const open=$('advancedFilters').classList.toggle('open');$('advancedToggle').classList.toggle('active',open);$('advancedToggle').setAttribute('aria-expanded',open)};$('resetFilters').onclick=()=>{['qualityFilter','effectFilter','seasonFilter','accessFilter','sortFilter'].forEach(id=>$(id).selectedIndex=0);['wishOnly','unvisitedOnly','nowOnly'].forEach(id=>$(id).checked=false);$('searchInput').value='';currentRegion='';document.querySelectorAll('.region-btn').forEach(b=>b.classList.toggle('active',b.dataset.region===''));applyFilters()};$('listToggle').onclick=()=>{const open=$('listPanel').classList.toggle('open');$('listToggle').setAttribute('aria-expanded',open)};$('closeList').onclick=()=>{$('listPanel').classList.remove('open');$('listToggle').setAttribute('aria-expanded','false')};
+$('locateBtn').onclick=()=>{if(!navigator.geolocation)return toast('現在地に対応していません');navigator.geolocation.getCurrentPosition(p=>{userPosition={lat:p.coords.latitude,lng:p.coords.longitude};if(userMarker)userMarker.remove();userMarker=L.circleMarker([userPosition.lat,userPosition.lng],{radius:8,color:'#1769aa',fillColor:'#4aa3df',fillOpacity:.8}).bindTooltip('現在地').addTo(map);map.setView([userPosition.lat,userPosition.lng],8);$('sortFilter').value='distance';applyFilters();toast('現在地から近い順に並べました')},()=>toast('現在地を取得できませんでした'),{timeout:10000})};
+function openPanel(s,marker){currentSpotName=s.name;const photo=$('panelPhoto');photo.style.display='block';photo.src=s.photo;photo.alt=s.name;let fallback=photo.nextElementSibling;if(!fallback||!fallback.classList.contains('photo-fallback')){fallback=document.createElement('div');fallback.className='photo-fallback';fallback.textContent='♨️';photo.after(fallback)}photo.onerror=()=>{photo.style.display='none';fallback.style.display='grid'};photo.onload=()=>{fallback.style.display='none';photo.style.display='block'};$('panelName').textContent=s.name;$('panelBadge').textContent=s.region;$('panelBadge').style.background=REGION_COLORS[s.region]||'#c45e1a';$('panelDesc').textContent=s.desc;$('panelQuality').textContent=s.quality;$('panelEffect').textContent=s.effect;$('panelSeason').textContent=s.season;$('panelAccess').textContent=s.access;$('panelUrl').innerHTML=`<a href="${esc(s.url)}" target="_blank" rel="noopener">🔗 公式サイトを見る</a>`;updateVisitBtn(s.name);updateWishBtn(s.name);$('spotNote').value=notes[s.name]?.text||'';renderUserPhoto(s.name);loadLiveInfo(s);$('routeBtn').onclick=()=>window.open(`https://www.google.com/maps/dir/?api=1&destination=${s.lat},${s.lng}`,'_blank','noopener');$('spotShareBtn').onclick=()=>shareSpot(s);$('planBtn').onclick=()=>addToPlan(s.name);$('fallbackSearchBtn').onclick=()=>window.open(`https://www.google.com/search?q=${encodeURIComponent(s.name+' 公式 温泉 最新情報')}`,'_blank','noopener');if(selectedMarkerEl)selectedMarkerEl.classList.remove('selected');const el=marker?._icon?.querySelector('.custom-marker');if(el){el.classList.add('selected');selectedMarkerEl=el}$('panel').classList.add('open');map.panTo([s.lat,s.lng],{animate:true})}
+function closePanel(){$('panel').classList.remove('open');if(selectedMarkerEl)selectedMarkerEl.classList.remove('selected');selectedMarkerEl=null;currentSpotName=null}
+function updateVisitBtn(name){const on=visited.has(name);$('visitBtn').classList.toggle('visited',on);$('visitBtnIcon').textContent=on?'✓':'☐';$('visitBtnText').textContent=on?'訪問済み（タップで解除）':'訪問済みにする'}
+function toggleVisited(){if(!currentSpotName)return;visited.has(currentSpotName)?visited.delete(currentSpotName):visited.add(currentSpotName);persist('japanOnsenVisited',[...visited]);updateVisitBtn(currentSpotName);updateCounter();renderMarkers();renderList()}
+function updateCounter(){const n=visited.size,p=Math.round(n/TOTAL*100);$('visitedCount').textContent=n;$('remainingCount').textContent=TOTAL-n;$('progressBar').style.width=p+'%';$('progressLabel').textContent=`${n} / ${TOTAL} 達成`}
+function updateWishBtn(name){$('wishBtn').textContent=wishes.has(name)?'♥ 行きたい済み':'♡ 行きたい'}
+$('wishBtn').onclick=()=>{if(!currentSpotName)return;wishes.has(currentSpotName)?wishes.delete(currentSpotName):wishes.add(currentSpotName);persist('japanOnsenWishes',[...wishes]);updateWishBtn(currentSpotName);renderList();toast(wishes.has(currentSpotName)?'行きたいに追加しました':'行きたいから外しました')};
+</script>
+<script>
+const weatherNames={0:'快晴',1:'晴れ',2:'一部曇り',3:'曇り',45:'霧',48:'霧氷',51:'弱い霧雨',61:'雨',63:'雨',65:'強い雨',71:'雪',80:'にわか雨',95:'雷雨'};
+async function loadLiveInfo(s){$('liveInfo').textContent='天気情報を取得中…';$('conditionAdvice').innerHTML='';const url=`https://api.open-meteo.com/v1/forecast?latitude=${s.lat}&longitude=${s.lng}&current=temperature_2m,weather_code,precipitation,wind_speed_10m&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max&timezone=Asia%2FTokyo&forecast_days=1`;try{const r=await fetch(url);if(!r.ok)throw 0;const d=await r.json(),c=d.current,rain=d.daily.precipitation_probability_max[0];$('liveInfo').innerHTML=`<div class="live-grid"><span>天気：${weatherNames[c.weather_code]||'変わりやすい'}</span><span>気温：${c.temperature_2m}℃</span><span>最高：${d.daily.temperature_2m_max[0]}℃</span><span>最低：${d.daily.temperature_2m_min[0]}℃</span><span>降水：${rain}%</span><span>風：${c.wind_speed_10m}km/h</span></div>`;$('conditionAdvice').innerHTML=travelAdvice(s,c,rain)}catch{$('liveInfo').textContent='天気情報を取得できませんでした。公式情報をご確認ください。'}}
+function travelAdvice(s,c,rain){const tips=[];if(c.temperature_2m<=5)tips.push('湯冷めしやすい気温です。入浴後は体と髪をよく乾かしましょう。');if(c.temperature_2m>=28)tips.push('入浴前後の水分補給を十分に。長湯は避けましょう。');if(rain>=50)tips.push('雨天時は露天風呂・山道・河原の増水に注意してください。');if(/冬|雪/.test(s.season))tips.push('積雪・凍結・冬季通行止めを出発前に確認してください。');tips.push('営業時間、日帰り入浴の可否、休館日は公式サイトで直前確認してください。');return tips.map(x=>`<div class="notice">${esc(x)}</div>`).join('')}
+$('saveNoteBtn').onclick=()=>{if(!currentSpotName)return;notes[currentSpotName]={text:$('spotNote').value,updated:new Date().toISOString()};persist('japanOnsenNotes',notes);toast('メモを保存しました')};
+$('photoInput').onchange=e=>{const f=e.target.files[0];if(!f||!currentSpotName)return;if(f.size>1200000)return toast('写真は1.2MB以下にしてください');const reader=new FileReader();reader.onload=()=>{userPhotos[currentSpotName]=reader.result;try{persist('japanOnsenPhotos',userPhotos);renderUserPhoto(currentSpotName);toast('写真を保存しました')}catch{delete userPhotos[currentSpotName];toast('保存容量が不足しています')}};reader.readAsDataURL(f)};
+function renderUserPhoto(name){$('userPhoto').innerHTML=userPhotos[name]?`<img src="${userPhotos[name]}" alt="自分で追加した${esc(name)}の写真" style="width:100%;margin-top:10px;border-radius:9px"><button class="action-btn danger" id="removePhoto">写真を削除</button>`:'';if($('removePhoto'))$('removePhoto').onclick=()=>{delete userPhotos[name];persist('japanOnsenPhotos',userPhotos);renderUserPhoto(name)}}
+$('savedBtn').onclick=()=>openDrawer('savedDrawer');$('dataBtn').onclick=()=>openDrawer('dataDrawer');document.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>$(b.dataset.close).classList.remove('open'));
+function openDrawer(id){document.querySelectorAll('.drawer').forEach(d=>d.classList.remove('open'));$(id).classList.add('open');if(id==='savedDrawer')renderSaved()}
+document.querySelectorAll('.tab-btn').forEach(b=>b.onclick=()=>{currentTab=b.dataset.tab;document.querySelectorAll('.tab-btn').forEach(x=>x.classList.toggle('active',x===b));renderSaved()});
+function addToPlan(name){if(tripPlan.some(x=>x.name===name))return toast('旅行計画に追加済みです');tripPlan.push({name,day:1});persist('japanOnsenPlan',tripPlan);toast('旅行計画に追加しました');renderSaved()}
+function renderSaved(){const box=$('savedContent');if(currentTab==='wishes'){const arr=[...wishes].map(spotByName).filter(Boolean);box.innerHTML=arr.length?arr.map(s=>`<div class="saved-item"><span><strong>${esc(s.name)}</strong><br><small>${esc(s.region)}・${esc(s.quality)}</small></span><span><button class="action-btn" data-add="${s.id}">計画へ</button><button class="action-btn danger" data-unwish="${s.id}">削除</button></span></div>`).join(''):'<p>まだ「行きたい」はありません。</p>';box.querySelectorAll('[data-add]').forEach(b=>b.onclick=()=>addToPlan(onsen[+b.dataset.add].name));box.querySelectorAll('[data-unwish]').forEach(b=>b.onclick=()=>{wishes.delete(onsen[+b.dataset.unwish].name);persist('japanOnsenWishes',[...wishes]);renderSaved();renderList()});return}const days=[...new Set(tripPlan.map(x=>x.day))].sort((a,b)=>a-b);box.innerHTML=tripPlan.length?days.map(day=>`<div class="plan-day">${day}日目</div>${tripPlan.filter(x=>x.day===day).map(x=>`<div class="plan-item"><span>${esc(x.name)}<br><small>${esc(spotByName(x.name)?.region||'')}</small></span><span><button class="action-btn" data-day="${esc(x.name)}">翌日へ</button><button class="action-btn danger" data-remove="${esc(x.name)}">削除</button></span></div>`).join('')}`).join(''):'<p>旅行計画は空です。温泉詳細から追加できます。</p>';if(tripPlan.length)box.innerHTML+=`<div class="action-row"><button class="action-btn primary" id="routeAll">選択地点を経路で開く</button><button class="action-btn" id="copyPlan">計画をコピー</button></div>`;box.querySelectorAll('[data-day]').forEach(b=>b.onclick=()=>{const x=tripPlan.find(x=>x.name===b.dataset.day);x.day++;persist('japanOnsenPlan',tripPlan);renderSaved()});box.querySelectorAll('[data-remove]').forEach(b=>b.onclick=()=>{tripPlan=tripPlan.filter(x=>x.name!==b.dataset.remove);persist('japanOnsenPlan',tripPlan);renderSaved()});if($('routeAll'))$('routeAll').onclick=()=>{const pts=tripPlan.map(x=>spotByName(x.name)).filter(Boolean);if(!pts.length)return;const origin=pts[0],dest=pts[pts.length-1],way=pts.slice(1,-1).map(s=>`${s.lat},${s.lng}`).join('|');window.open(`https://www.google.com/maps/dir/?api=1&origin=${origin.lat},${origin.lng}&destination=${dest.lat},${dest.lng}${way?'&waypoints='+encodeURIComponent(way):''}`,'_blank','noopener')};if($('copyPlan'))$('copyPlan').onclick=()=>copyText(days.map(d=>`${d}日目：`+tripPlan.filter(x=>x.day===d).map(x=>x.name).join(' → ')).join('\n'),'旅行計画をコピーしました')}
+function appData(){return{version:1,visited:[...visited],wishes:[...wishes],tripPlan,notes}}
+function copyText(text,msg){if(navigator.clipboard?.writeText)navigator.clipboard.writeText(text).then(()=>toast(msg)).catch(()=>fallbackCopy(text,msg));else fallbackCopy(text,msg)}function fallbackCopy(text,msg){const t=document.createElement('textarea');t.value=text;document.body.appendChild(t);t.select();document.execCommand('copy');t.remove();toast(msg)}
+function shareSpot(s){copyText(`${s.name}｜日本 温泉地マップ\n泉質：${s.quality}\n${s.desc}\nhttps://www.google.com/maps/search/?api=1&query=${s.lat},${s.lng}`,'温泉情報をコピーしました')}
+$('copyShareBtn').onclick=()=>{const encoded=btoa(unescape(encodeURIComponent(JSON.stringify(appData()))));copyText(location.href.split('#')[0]+'#data='+encoded,'共有リンクをコピーしました')};
+$('exportBtn').onclick=()=>{const blob=new Blob([JSON.stringify(appData(),null,2)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`japan-onsen-map-${new Date().toISOString().slice(0,10)}.json`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)};
+$('importInput').onchange=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{try{importData(JSON.parse(r.result));toast('データを読み込みました')}catch{toast('読み込めないファイルです')}};r.readAsText(f)};
+function importData(d){visited=new Set(d.visited||[]);wishes=new Set(d.wishes||[]);tripPlan=d.tripPlan||[];notes=d.notes||{};persist('japanOnsenVisited',[...visited]);persist('japanOnsenWishes',[...wishes]);persist('japanOnsenPlan',tripPlan);persist('japanOnsenNotes',notes);updateCounter();applyFilters();renderSaved()}
+$('clearDataBtn').onclick=()=>{if(!confirm('訪問履歴・行きたい・計画・メモ・写真をすべて消去しますか？'))return;['japanOnsenVisited','japanOnsenWishes','japanOnsenPlan','japanOnsenNotes','japanOnsenPhotos'].forEach(k=>localStorage.removeItem(k));visited=new Set();wishes=new Set();tripPlan=[];notes={};userPhotos={};updateCounter();applyFilters();toast('保存データを消去しました')};
+if(location.hash.startsWith('#data=')){try{importData(JSON.parse(decodeURIComponent(escape(atob(location.hash.slice(6))))));history.replaceState(null,'',location.pathname+location.search);toast('共有データを読み込みました')}catch{}}
+document.addEventListener('keydown',e=>{if(e.key==='Escape'){document.querySelectorAll('.drawer,.advanced-filters,.list-panel').forEach(x=>x.classList.remove('open'));closePanel()}if(e.key==='/'&&document.activeElement.tagName!=='INPUT'&&document.activeElement.tagName!=='TEXTAREA'){e.preventDefault();$('searchInput').focus()}});
+function refreshMapSize(){requestAnimationFrame(()=>{if(map&&map.invalidateSize)map.invalidateSize({pan:false})})}
+window.addEventListener('resize',refreshMapSize,{passive:true});window.addEventListener('orientationchange',()=>setTimeout(refreshMapSize,250),{passive:true});if(window.visualViewport)window.visualViewport.addEventListener('resize',refreshMapSize,{passive:true});
+updateCounter();applyFilters();
+setTimeout(refreshMapSize,0);setTimeout(refreshMapSize,300);setTimeout(refreshMapSize,1000);
+</script>
+<!-- MULTILINGUAL_START -->
+<script>const MULTILINGUAL_KIND="onsen";const MULTILINGUAL_TRANSLATIONS={"en":{"登別温泉":{"name":"Noboribetsu Onsen","desc":"Hokkaido's largest hot spring resort, famous for \"Jigokudani\". Boasting a wide variety of spring qualities, it boasts one of the highest volumes of hot water in Japan. The bear farm and Jigokudani promenade are also popular.","quality":"9 types including sulfur spring, salt spring, alum spring, etc.","effect":"Neuralgia, skin diseases, fatigue recovery, rheumatism","season":"All year round (in winter, the open-air bath with snowy scenery is exquisite)","access":"Approximately 15 minutes by bus from Noboribetsu Station"},"洞爺湖温泉":{"name":"Toyako Onsen","desc":"A hot spring resort located on the shore of Lake Toya, a caldera lake. The long summer fireworks display and excursion boats are popular. Also certified as a global geopark.","quality":"Chloride spring (sodium chloride spring)","effect":"Sensitivity to cold, recovery from fatigue, neuralgia, women's diseases","season":"All year round (April to October is best)","access":"Approximately 15 minutes by bus from Toya Station"},"定山渓温泉":{"name":"Jozankei Onsen","desc":"\"Sapporo's Okuzashiki\" is about an hour's drive from Sapporo city. Inns line the valley of the Toyohira River, and it is also a famous spot for viewing autumn leaves.","quality":"Chloride spring/sulfate spring","effect":"Recovery from fatigue, sensitivity to cold, neuralgia, cuts","season":"All year round (October is especially popular during the autumn leaves season)","access":"Approximately 70 minutes by bus from Sapporo Station"},"層雲峡温泉":{"name":"Sounkyo Onsen","desc":"The gateway to Daisetsuzan National Park. The beauty of the Sounkyo valley with its continuous cliffs is breathtaking, and the winter Icefall Festival is also famous.","quality":"Chloride spring (sodium/calcium chloride spring)","effect":"Sensitivity to cold, recovery from fatigue, neuralgia, rheumatism","season":"All year round (winter icefall, summer mountain climbing season)","access":"Approximately 30 minutes by bus from Kamikawa Station"},"阿寒湖温泉":{"name":"Lake Akan Onsen","desc":"A hot spring on the shores of Lake Akan where the natural monument marimo lives. It is also a hub of Ainu culture, and you can see Koshanbe and Iomante ceremonies at the Ainu kotan (village).","quality":"Sulfate spring/chloride spring","effect":"Fatigue recovery, neuralgia, rheumatism, beautiful skin","season":"All year round (April to November is best)","access":"Approximately 90 minutes by car from Kushiro Airport"},"知床ウトロ温泉":{"name":"Shiretoko Utoro Onsen","desc":"A hot spring area that is the base of the world natural heritage site, the Shiretoko Peninsula. The attraction is the luxurious experience of soaking in the power of nature such as drift ice, brown bears, and white-tailed eagles in a soothing hot spring.","quality":"Chloride spring (sodium chloride spring)","effect":"Recovery from fatigue, sensitivity to cold, neuralgia","season":"April to November (February to March during the drift ice season is especially valuable)","access":"Approximately 2 hours by car from Memanbetsu Airport"},"ニセコ温泉郷":{"name":"Niseko hot spring village","desc":"Niseko is also famous as an international ski resort. The open-air bath overlooking Mt. Yotei has a spectacular view, and is popular in the winter when you can enjoy the powder snow and hot springs.","quality":"Sulfur spring/bicarbonate earth spring","effect":"Fatigue recovery, neuralgia, skin disease, rheumatism","season":"All year round (skiing from December to March)","access":"Shuttle bus from Niseko Station to each hot spring"},"支笏湖温泉":{"name":"Lake Shikotsu Onsen","desc":"A hot spring on the shore of Lake Shikotsu, a caldera lake with outstanding transparency. You can enjoy it in combination with activities such as canoeing and diving.","quality":"hydrogen carbonate spring","effect":"Neuralgia, muscle pain, fatigue recovery, beautiful skin","season":"All year round (winter's Ice Festival is fantastic)","access":"Approximately 40 minutes by bus from Chitose Station"},"豊富温泉":{"name":"Toyotomi Onsen","desc":"Japan's northernmost hot spring area. It is a hot spring that contains petroleum components, which is rare in Japan because it gushes out along with petroleum-associated gas, and is attracting attention for its effectiveness in treating atopic dermatitis.","quality":"Oil-containing salt spring (chloride spring)","effect":"Atopic dermatitis, skin diseases, neuralgia","season":"All year round","access":"Approximately 5 minutes by car from Toyotomi Station"},"十勝川温泉":{"name":"Tokachigawa Onsen","desc":"It is famous as a botanical moor hot spring. This is a rare hot spring that contains a ``mol'' made up of ancient plants, and is known as a ``beauty hot spring'' for its skin-beautifying effects.","quality":"Moor spring (vegetable humus saline spring)","effect":"Beautiful skin, neuralgia, fatigue recovery, chronic skin disease","season":"All year round (combination with winter swan watching is popular)","access":"Approximately 40 minutes by bus from Obihiro Station"},"酸ヶ湯温泉":{"name":"Sukayu Onsen","desc":"One of the oldest spas in Japan, located in the Hakkoda mountains. It is famous for its large cypress-made mixed bathing bath called the Senninburo. Full of the charm of a secret hot spring.","quality":"Acidic sulfur spring (hydrogen sulfide acidic spring)","effect":"Rheumatism, neuralgia, skin disease, diabetes","season":"All year round (in winter, it becomes an isolated island due to heavy snowfall)","access":"Approximately 65 minutes by bus from Aomori Station"},"乳頭温泉郷":{"name":"Nyuto Onsenkyo","desc":"A secret hot spring in Akita Prefecture. It is famous for its 7 unique hot springs, including Tsuru-no-yu and Taeno-yu. Tsuru-no-yu is especially famous for its beautiful milky white water.","quality":"Sulfur spring/hydrogen carbonate spring (varies depending on the inn)","effect":"Neuralgia, rheumatism, fatigue recovery, beautiful skin","season":"All year round (the snow-viewing bath in winter is spectacular)","access":"Approximately 45 minutes by bus from Tazawako Station"},"蔵王温泉":{"name":"Zao Onsen","desc":"A highly acidic hot spring that gushes out at the foot of Yamagata Zao Ski Resort. The collaboration of cloudy hot springs and frost-covered trees (ice monsters) is a winter tradition.","quality":"acidic sulfate chloride spring","effect":"Neuralgia, muscle pain, chronic skin disease, fatigue recovery","season":"All year round (winter rime tours are especially popular)","access":"Approximately 40 minutes by bus from Yamagata Station"},"鳴子温泉郷":{"name":"Naruko hot spring village","desc":"Miyagi's inner parlor. A diverse hot spring area with 9 of the 11 types of hot springs in Japan. It is also famous as a production area for kokeshi dolls.","quality":"Sulfur springs, chloride springs, and many others","effect":"Neuralgia, rheumatism, fatigue recovery, beautiful skin","season":"All year round (October is the busiest month for autumn leaves)","access":"Within walking distance from Naruko Onsen Station"},"銀山温泉":{"name":"Ginzan Onsen","desc":"A hot spring town that looks like a picture postcard, with wooden inns lining the Shirogane River that exude Taisho romance. The scenery lit up by gas lamps in the evening looks like something out of a movie.","quality":"Chloride spring/hydrogen carbonate spring","effect":"Neuralgia, fatigue recovery, sensitivity to cold, beautiful skin","season":"All year round (the snowy winter scenery is the most magical)","access":"Approximately 40 minutes by bus from Oishida Station"},"花巻温泉郷":{"name":"Hanamaki Onsenkyo","desc":"A hot spring in Hanamaki City, the hometown of Kenji Miyazawa. It is a hot spring village where you can enjoy touring the hot springs that are made up of multiple hot spring areas such as Dai Onsen and Hanamaki Onsen.","quality":"Chloride spring/hydrogen carbonate spring","effect":"Neuralgia, fatigue recovery, chronic digestive diseases, sensitivity to cold","season":"All year round","access":"Approximately 30 minutes by bus from Hanamaki Station"},"秋保温泉":{"name":"Akiu hot spring","desc":"A hot spring that has been popular as a back-room in Sendai for a long time. The natural beauty of Akiu Otaki and Rairikyo Gorge is also attractive. There are many large inns, making it an ideal base for sightseeing in Sendai.","quality":"Chloride spring (sodium chloride spring)","effect":"Recovery from fatigue, neuralgia, sensitivity to cold, skin diseases","season":"All year round","access":"Approximately 40 minutes by bus from Sendai Station"},"東山温泉":{"name":"Higashiyama Onsen","desc":"A famous hot spring in Aizuwakamatsu, known as ``Aizu's inner parlor''. Close to Tsuruga Castle, it is a popular base for sightseeing in Aizu.","quality":"Chloride spring/sulfate spring","effect":"Fatigue recovery, neuralgia, rheumatism, chronic skin disease","season":"All year round (especially beautiful during the autumn leaves season)","access":"Approximately 10 minutes by bus from Aizuwakamatsu Station"},"飯坂温泉":{"name":"Iizaka Onsen","desc":"One of the oldest hot springs in Tohoku, visited by Matsuo Basho. Hot spring culture has been rooted in the area for a long time, with hot spring tours centered around the communal bath ``Sabakoyu''.","quality":"Chloride spring (sodium chloride spring)","effect":"Recovery from fatigue, neuralgia, sensitivity to cold, digestive disorders","season":"All year round","access":"Short walk from Iizakaonsen Station"},"土湯温泉":{"name":"Tsuchiyu Onsen","desc":"A hot spring area located to the west of Fukushima City. It is also a production area for kokeshi dolls, and is characterized by a calm atmosphere with inns dotted along the Arakawa Valley.","quality":"Hydrogen carbonate spring/chloride spring","effect":"Neuralgia, fatigue recovery, chronic skin disease, sensitivity to cold","season":"All year round","access":"Approximately 50 minutes by bus from Fukushima Station"},"磐梯熱海温泉":{"name":"Bandai Atami Onsen","desc":"A hot spring area near Goshikinuma at the foot of Mt. Bandai. It is popular as the inner quarters of Koriyama City, and has an abundant amount of hot spring water and a variety of accommodation facilities.","quality":"Chloride spring/hydrogen carbonate spring","effect":"Fatigue recovery, neuralgia, rheumatism, sensitivity to cold","season":"All year round","access":"A short walk from Bandai-Atami Station"},"遠刈田温泉":{"name":"Togatta Onsen","desc":"A hot spring area at the foot of the Zao mountain range. Famous as one of the birthplaces of kokeshi dolls, it is a tourist hub located between Zao and Matsushima.","quality":"Chloride spring (sodium chloride spring)","effect":"Fatigue recovery, neuralgia, muscle pain, beautiful skin","season":"All year round (winter is also popular during Zao ski season)","access":"Approximately 30 minutes by bus from Shiroishi Zao Station"},"夏油温泉":{"name":"Natsuyu hot spring","desc":"A secret hot spring in Kitakami City, Iwate Prefecture. This mountain hot spring is famous for its wild hot springs with multiple sources, and is closed during the winter, where you can enjoy open-air baths with a rustic feel, such as Oyu and Taki-no-yu.","quality":"Sulfur spring/hydrogen carbonate spring","effect":"Neuralgia, rheumatism, skin disease, fatigue recovery","season":"May to November (closed in winter)","access":"Approximately 60 minutes by car from Kitakami Station"},"大鰐温泉":{"name":"Owani Onsen","desc":"Owani is famous as the best hot spring area in Aomori Prefecture. It has long been known as the ``Okuzashiki of Tsugaru'', and you can enjoy ski resorts and hot springs.","quality":"Chloride spring (sodium chloride spring)","effect":"Fatigue recovery, neuralgia, rheumatism, sensitivity to cold","season":"All year round","access":"Short walk from Owani Onsen Station"},"草津温泉":{"name":"Kusatsu Onsen","desc":"One of Japan's three famous hot springs. It is famous for its highly acidic sulfur springs and ``yumomi'' culture. The hot spring town centered around Yubatake is full of elegance and is visited by more than 2 million people a year.","quality":"Acid chloride sulfate spring","effect":"Skin diseases, diabetes, neuralgia, rheumatism","season":"All year round (both winter for skiing and summer for fresh greenery are popular)","access":"Approximately 25 minutes by bus from Naganohara Kusatsuguchi Station"},"伊香保温泉":{"name":"Ikaho Onsen","desc":"A famous hot spring in Joshu, famous for its stone steps. It has two types of hot springs: the brown golden hot spring and the transparent white silver hot spring. It is also a place associated with Tokutomi Roka.","quality":"Chloride sulfate spring (Kogane-no-Yu)/hydrogen carbonate spring (Shirogane-no-Yu)","effect":"Recovery from fatigue, neuralgia, women's diseases, sensitivity to cold","season":"All year round","access":"Approximately 20 minutes by bus from Shibukawa Station"},"四万温泉":{"name":"Shima Onsen","desc":"A hot spring in the mountains of Gunma that is said to heal 40,000 illnesses. The cobalt blue Sekizenkan building is so dreamlike that it is said to be the model for a Miyazaki movie.","quality":"Chloride spring/hydrogen carbonate spring","effect":"Digestive diseases, neuralgia, fatigue recovery, women's diseases","season":"All year round (fresh greenery and autumn leaves are especially beautiful)","access":"Approximately 40 minutes by bus from Nakanojo Station"},"水上温泉":{"name":"Minakami Onsen","desc":"A hot spring resort located at the headwaters of the Tone River. There are many activities such as rafting and SL Minakami, and the combination of winter skiing and hot springs is popular.","quality":"Chloride spring (sodium chloride spring)","effect":"Fatigue recovery, neuralgia, sensitivity to cold, rheumatism","season":"All year round (Rafting from May to October)","access":"Walk/bus from Minakami Station"},"宝川温泉":{"name":"Takaragawa Onsen","desc":"A secret hot spring known for having one of the largest mixed bathing open-air baths in Japan. The total area of ​​the four large open-air baths is over 470㎡. A solitary inn located at the deepest part of Minakami Onsen Village.","quality":"chloride spring","effect":"Fatigue recovery, neuralgia, rheumatism","season":"Year-round (Yukimi open-air is especially popular)","access":"Approximately 40 minutes by bus from Minakami Station"},"万座温泉":{"name":"Manza Onsen","desc":"Japan's highest hot spring located at an altitude of 1,800m. The sulfur content is particularly high, and the cloudy water is unique. It has the feel of a secret hot spring even deeper in the mountains than Kusatsu.","quality":"acidic sulfur spring","effect":"Neuralgia, rheumatism, skin diseases, chronic women's diseases","season":"All year round (especially crowded during ski season)","access":"Approximately 50 minutes by car from Karuizawa Station"},"箱根温泉":{"name":"Hakone Onsen","desc":"The metropolitan area's premier hot spring resort. The open-air bath with a view of Mt. Fuji is popular, with a variety of hot springs, art museums, and spectacular views. Over 20 million people visit each year.","quality":"Chloride spring, sulfate spring, hydrogen carbonate spring, and many others","effect":"Fatigue recovery, neuralgia, beautiful skin, sensitivity to cold","season":"All year round","access":"Approximately 90 minutes from Shinjuku by Odakyu Romancecar"},"熱海温泉":{"name":"Atami hot spring","desc":"One of Japan's leading hot spring resorts located at strategic points along the Tokaido. It is a famous hot spring loved by Tokugawa Ieyasu, and is also popular as a coastal resort for the Atami Sea Fireworks Festival and Atami Sun Beach.","quality":"Chloride spring (sodium/calcium chloride spring)","effect":"Fatigue recovery, neuralgia, sensitivity to cold, beautiful skin","season":"All year round","access":"Approximately 45 minutes from Tokyo on the Tokaido Shinkansen/Kodama"},"伊東温泉":{"name":"Ito Onsen","desc":"Izu's largest hot spring resort. Boasting an abundant amount of hot water (30,000 liters per minute) and over 200 hot springs, it is said to be one of Japan's top three hot springs.","quality":"Chloride spring (sodium/calcium chloride spring)","effect":"Recovery from fatigue, neuralgia, muscle pain, chronic skin disease","season":"All year round","access":"Approximately 1 hour and 40 minutes by Limited Express Odoriko from Tokyo Station"},"修善寺温泉":{"name":"Shuzenji Onsen","desc":"The oldest hot spring in Izu. A charming hot spring town with a bamboo forest path centered around Shuzenji Temple. A place of literature loved by Natsume Soseki and Kawabata Yasunari.","quality":"chloride spring","effect":"Fatigue recovery, neuralgia, sensitivity to cold, women's diseases","season":"All year round (plum blossoms, cherry blossoms, autumn leaves and the beauty of each season)","access":"Approximately 10 minutes by bus from Shuzenji Station"},"湯河原温泉":{"name":"Yugawara Onsen","desc":"An old hot spring mentioned in the Manyoshu. Inns are dotted on the hill overlooking Sagami Bay, and it has been loved by literary figures and artists as a hidden hot spring near Tokyo.","quality":"Chloride spring (sodium/calcium chloride spring)","effect":"Recovery from fatigue, neuralgia, chronic women's diseases, sensitivity to cold","season":"All year round (February, famous for its plum grove, is also popular)","access":"Approximately 10 minutes by bus from Yugawara Station"},"鬼怒川温泉":{"name":"Kinugawa Onsen","desc":"One of the best hot spring resorts in Kanto, deep in Nikko. Large inns line the valley of the Kinugawa River, and it is also a popular base for sightseeing in SL Taiju and Nikko Toshogu Shrine.","quality":"Alkaline simple spring","effect":"Fatigue recovery, neuralgia, rheumatism, sensitivity to cold","season":"All year round","access":"Walk from Kinugawa Onsen Station on the Tobu Nikko Line"},"塩原温泉郷":{"name":"Shiobara hot spring village","desc":"A hot spring village with 11 hot spring spots dotted along the Hoki River. With 11 types of hot springs, the variety of hot springs is attractive and has even been visited by ``hot spring experts''.","quality":"Sulfate spring, chloride spring and 11 other types","effect":"Neuralgia, fatigue recovery, chronic skin diseases, digestive diseases","season":"All year round (October is especially beautiful with autumn leaves)","access":"Approximately 50 minutes by bus from Nasushiobara Station"},"那須温泉郷":{"name":"Nasu hot spring village","desc":"A hot spring resort located at the foot of Mt. Nasu. You can enjoy visiting a variety of hot springs, including Sesshoseki's ``Deer Bath'', and it is also popular to combine this with sightseeing at Nasu Highland Park.","quality":"Acidic sulfate spring/chloride spring","effect":"Neuralgia, rheumatism, fatigue recovery, skin disease","season":"All year round (fresh green leaves, autumn leaves, and skiing are popular)","access":"Approximately 45 minutes by bus from Nasushiobara Station"},"石和温泉":{"name":"Isawa Onsen","desc":"The largest hot spring area in Yamanashi Prefecture, located in the Kofu Basin. There are inns scattered among the vineyards, where you can enjoy a trip that combines wine and hot springs. There are also spectacular views of Mt. Fuji and the Southern Alps.","quality":"Alkaline simple hot spring","effect":"Fatigue recovery, neuralgia, sensitivity to cold, beautiful skin","season":"All year round (autumn is especially popular for grapes and wine)","access":"Short walk from Isawa Onsen Station"},"下呂温泉":{"name":"Gero Onsen","desc":"One of Japan's three famous springs. It is a quaint hot spring town with inns lined up along the Hida River, and the clear, colorless sodium hydrogen carbonate spring is highly effective for beautifying the skin.","quality":"Alkaline simple hot spring (hydrogen carbonate spring)","effect":"Beautiful skin, neuralgia, fatigue recovery, chronic digestive diseases","season":"All year round","access":"Approximately 1 hour and 40 minutes by limited express Hida from Nagoya Station"},"奥飛騨温泉郷":{"name":"Okuhida Onsenkyo","desc":"A general term for five hot spring areas (Hirayu, Fukuchi, Shin-Hirayu, Tochio, and Shinhotaka) scattered at the foot of the Northern Alps. It boasts the largest number of open-air baths in Japan.","quality":"Simple hot springs, hydrogen carbonate springs, chloride springs","effect":"Fatigue recovery, neuralgia, beautiful skin, rheumatism","season":"Year-round (Autumn leaves and winter snow are spectacular)","access":"Approximately 1 hour by bus from Takayama Station"},"白骨温泉":{"name":"Shirahone Onsen","desc":"It is said that if you stay in the water for 3 days, you will not catch a cold for 3 years. A hidden mountain hot spring near Kamikochi, famous for its mysterious cloudy white open-air bath.","quality":"Sulfur-containing calcium/magnesium hydrogen carbonate spring","effect":"Fatigue recovery, neuralgia, digestive disorders, skin diseases","season":"Late April to November (partially closed in winter)","access":"Approximately 2 hours by bus from Matsumoto Station"},"野沢温泉":{"name":"Nozawa Onsen","desc":"A famous hot spring in Shinshu with 13 public baths called Sotoyu. It is also the birthplace of Nozawana, and the best part of your trip is walking around the hot spring town and visiting the public baths. Skiing is also popular in winter.","quality":"Chloride spring/sulfate spring","effect":"Neuralgia, rheumatism, fatigue recovery, women's diseases","season":"All year round (skiing from November to April)","access":"Approximately 25 minutes by bus from Iiyama Station"},"渋温泉":{"name":"Shibu Onsen","desc":"An old hot spring in Nagano that is famous for its nine outdoor baths. The sight of Japanese macaques bathing in the snow-viewing open-air bath at Jigokudani Monkey Park is world-famous.","quality":"Chloride spring/sulfate spring","effect":"Neuralgia, fatigue recovery, chronic skin disease, rheumatism","season":"All year round (winter, famous for snow monkeys, is the high season)","access":"Approximately 10 minutes by bus from Yudanaka Station"},"別所温泉":{"name":"Bessho Onsen","desc":"A hot spring in Ueda famous for the Kitamukai Kannon, also known as the \"Kamakura of Shinshu.\" Highlights include a tour of the three outdoor baths and the three-storied pagoda, which is an important cultural property.","quality":"Chloride spring (sodium chloride spring)","effect":"Fatigue recovery, neuralgia, rheumatism, beautiful skin","season":"All year round","access":"Short walk from Bessho Onsen Station"},"諏訪温泉":{"name":"Suwa Onsen","desc":"A historic hot spring area on the shores of Lake Suwa. You can enjoy one of Japan's oldest shrines and hot springs at the base of Suwa Taisha, the headquarters of Suwa Shrines nationwide.","quality":"Chloride spring (sodium/calcium chloride spring)","effect":"Recovery from fatigue, neuralgia, chronic women's diseases, sensitivity to cold","season":"All year round (famous for the winter shrine crossing)","access":"Short walk from Kamisuwa Station"},"山代温泉":{"name":"Yamashiro Onsen","desc":"A hot spring resort that represents Kaga Onsenkyo. Loved by many literary figures such as Akiko Yosano and Kyoka Izumi, this charming hot spring town is centered around Kiku no Yu.","quality":"Chloride spring (sodium chloride spring)","effect":"Neuralgia, fatigue recovery, chronic skin disease, sensitivity to cold","season":"All year round","access":"Approximately 10 minutes by bus from Kaga Onsen Station"},"山中温泉":{"name":"Yamanaka Onsen","desc":"A famous hot spring in Kaga that Matsuo Basho hailed as the ``Hot Spring of Success.'' A hot spring town full of atmosphere, with inns lined up along the valley of Kakusenkei. It is also a production area of ​​Kutani ware.","quality":"Chloride spring (sodium/calcium chloride spring)","effect":"Fatigue recovery, neuralgia, chronic digestive diseases, women's diseases","season":"All year round (the autumn leaves in the valley are especially beautiful)","access":"Approximately 25 minutes by bus from Kaga Onsen Station"},"片山津温泉":{"name":"Katayamazu Onsen","desc":"A hot spring resort in Kaga Onsenkyo that springs out on the shores of Lake Shibayamagata. A quaint hot spring town with beautiful views of Mt. Hakusan and the geyser gushing out in the center of the lake.","quality":"Chloride spring (sodium chloride spring)","effect":"Fatigue recovery, neuralgia, sensitivity to cold, beautiful skin","season":"All year round","access":"Approximately 10 minutes by bus from Kaga Onsen Station"},"和倉温泉":{"name":"Wakura Onsen","desc":"The largest hot spring resort in Ishikawa Prefecture, known as the ``Okuzashiki of Noto''. The attraction is the spectacular view of Nanao Bay, the abundant amount of hot water, and the seafood. There are famous inns such as Kagaya.","quality":"Chloride spring (sodium/calcium chloride spring)","effect":"Recovery from fatigue, neuralgia, chronic skin disease, sensitivity to cold","season":"All year round","access":"Approximately 5 minutes by bus from Wakura Onsen Station"},"芦原温泉":{"name":"Awara Onsen","desc":"A hot spring resort in Hokuriku. Close to the Echizen coast, you can enjoy fresh seafood from the Sea of ​​Japan and hot springs at the same time. It is easily accessible as it is the last stop of the Awara Onsen Echizen Railway.","quality":"Chloride spring (sodium/calcium chloride spring)","effect":"Recovery from fatigue, neuralgia, women's diseases, sensitivity to cold","season":"All year round (winter is the peak season for Echizen crab)","access":"Approximately 10 minutes by bus from Awara Onsen Station"},"粟津温泉":{"name":"Awazu Onsen","desc":"An old hot spring in Kaga with a legend that it opened in 718. It is world-famous as a hot spring resort where Japan's oldest inn, Hoshi, is located. Quiet and relaxing atmosphere.","quality":"Chloride spring (sodium chloride spring)","effect":"Fatigue recovery, neuralgia, rheumatism, chronic digestive diseases","season":"All year round","access":"Approximately 30 minutes by bus from Komatsu Station"},"越後湯沢温泉":{"name":"Echigo Yuzawa Onsen","desc":"The setting for Yasunari Kawabata's novel \"Snow Country\". Known as one of Japan's best ski resorts, the hot springs you can enjoy amidst the snowy scenery of the Echigo mountains will tempt you to travel.","quality":"simple hot spring","effect":"Fatigue recovery, neuralgia, sensitivity to cold, beautiful skin","season":"All year round (skiing from December to March)","access":"A short walk from Echigo-Yuzawa Station on the Joetsu Shinkansen"},"月岡温泉":{"name":"Tsukioka Onsen","desc":"A hot spring area in Niigata characterized by emerald green sulfur springs. Known as the ``Beauty Bath'', the hot spring town's food and geisha culture are also attractive.","quality":"Sulfur-containing sodium chloride spring","effect":"Beautiful skin, neuralgia, fatigue recovery, chronic skin disease","season":"All year round","access":"Approximately 35 minutes by bus from Toyosaka Station"},"城崎温泉":{"name":"Kinosaki Onsen","desc":"A famous hot spring in Hyogo that is famous for Naoya Shiga's novel \"At Kinosaki.\" This is Kansai's best hot spring town where you can visit seven public baths and walk around wearing yukata.","quality":"Chloride spring (sodium chloride spring)","effect":"Recovery from fatigue, neuralgia, chronic women's diseases, sensitivity to cold","season":"All year round (Matsuba crab is especially popular in winter)","access":"Short walk from Kinosaki Onsen Station"},"有馬温泉":{"name":"Arima Onsen","desc":"One of Japan's three famous hot springs. The most convenient hot spring resort near Osaka and Kobe. There are two famous types of hot springs: ``Kin-no-Yu'' (brown color containing iron) and ``Gin-no-Yu'' (carbonated spring).","quality":"Iron-containing strong chloride spring (Kin-no-Yu)/hydrogen carbonate spring (Gin-no-Yu)","effect":"Neuralgia, muscle pain, sensitivity to cold, recovery from fatigue","season":"All year round","access":"A short walk from Kobe Electric Railway Arima Onsen Station"},"白浜温泉":{"name":"Shirahama hot spring","desc":"A hot spring resort in Wakayama near the Kumano Kodo. A resort area with Adventure World, famous for its pandas, the spectacular view of Engetsu Island, and the white sand of Shirarahama Beach.","quality":"Chloride spring (sodium chloride spring)","effect":"Recovery from fatigue, neuralgia, sensitivity to cold, chronic skin disease","season":"All year round (summer is especially popular for swimming at the beach)","access":"About 10 minutes by bus from Shirahama Station"},"湯の峰温泉":{"name":"Yunomine Onsen","desc":"Japan's oldest hot spring (over 1800 years of history) where worshipers who walked the Kumano Kodo took a bath. Tsuboyu, a hot spring registered as a World Heritage Site, is a mysterious hot spring that changes color six times a day.","quality":"Sulfur-containing sodium hydrogen carbonate spring","effect":"Recovery from fatigue, neuralgia, skin diseases, chronic digestive diseases","season":"All year round","access":"Approximately 70 minutes by bus from Shingu Station"},"川湯温泉":{"name":"Kawayu Onsen","desc":"A rare hot spring area where hot springs gush out from the bottom of the Oto River. In winter, the ``Senninburo'' (approximately 50m long) created by damming the river becomes a famous large open-air bath.","quality":"Hydrogen carbonate spring (baking soda spring)","effect":"Fatigue recovery, neuralgia, chronic skin disease, beautiful skin","season":"All year round (Senninburo from December to February)","access":"Approximately 90 minutes by bus from Shingu Station"},"南紀勝浦温泉":{"name":"Nanki Katsuura Onsen","desc":"A hot spring resort overlooking the Pacific Ocean. The port town of Nachi-Katsuura is famous for its tuna catches, and is also close to the World Heritage Site, Nachi Falls. Boki Cave is famous for its characteristic cave bath.","quality":"Chloride spring (sodium chloride spring)","effect":"Recovery from fatigue, sensitivity to cold, neuralgia, chronic skin disease","season":"All year round","access":"Walk/boat from Kii-Katsuura Station"},"湯村温泉（兵庫）":{"name":"Yumura Onsen (Hyogo)","desc":"It is famous for its culture of boiling eggs and vegetables in ``Arayu,'' a hot spring of 98 degrees Celsius. This is a place in the San'in area that is associated with Matsumoto Seicho, and is the setting for the drama ``Yumechiyo Diary.''","quality":"Bicarbonate salt spring","effect":"Fatigue recovery, neuralgia, chronic gastrointestinal disease, women's disease","season":"All year round","access":"Approximately 20 minutes by bus from Hamasaka Station"},"龍神温泉":{"name":"Ryujin Onsen","desc":"One of Japan's three beauties. It springs along the Takano Ryujin Skyline and is famous for its strong alkaline properties and beautifying skin. Enjoy the atmosphere of a secret hot spring in the silence of a deep mountain valley.","quality":"Simple hot spring (alkaline)","effect":"Beautiful skin, recovery from fatigue, neuralgia, sensitivity to cold","season":"All year round (autumn leaves are spectacular)","access":"Approximately 80 minutes by car from Hashimoto Station"},"洲本温泉":{"name":"Sumoto Onsen","desc":"A hot spring resort in the southern part of Awaji Island. You can enjoy spectacular views of the Naruto Strait and seafood such as Awaji Island's specialty onions and Naruto sea bream.","quality":"chloride spring","effect":"Recovery from fatigue, neuralgia, sensitivity to cold","season":"All year round","access":"Bus/taxi from Sumoto Bus Center"},"天橋立温泉":{"name":"Amanohashidate Onsen","desc":"A hot spring resort in Kyoto prefecture overlooking Amanohashidate, one of Japan's three most scenic views. A luxurious experience where you can enjoy the spectacular view of Amanohashidate, where the sandbar extends into the Sea of ​​Japan, from a hot spring inn.","quality":"Chloride spring (sodium/calcium chloride spring)","effect":"Fatigue recovery, neuralgia, chronic skin disease, beautiful skin","season":"All year round (autumn with beautiful autumn leaves on the pine trees)","access":"A short walk from Amanohashidate Station"},"皆生温泉":{"name":"Kaike Onsen","desc":"Tottori Prefecture's largest hot spring resort overlooking the Sea of Japan. This is a rare hot spring whose source springs from the ocean floor of the Sea of ​​Japan, and the attraction is the spectacular view of Mt. Daisen and the fresh seafood from Sakaiminato.","quality":"Chloride spring (sodium/calcium chloride spring)","effect":"Recovery from fatigue, neuralgia, sensitivity to cold, chronic skin disease","season":"All year round","access":"Approximately 15 minutes by bus from Yonago Station"},"三朝温泉":{"name":"Misasa Onsen","desc":"One of the world's leading radium hot springs. It has one of the highest levels of radon in the world, and the springs are both drinkable and inhalable. It is also the starting point for climbing Mt. Mitoku Sanbutsu-ji Temple (Nageire-do Hall).","quality":"Radioactive spring (radium spring)","effect":"Gout, neuralgia, chronic women's diseases, arthritis","season":"All year round","access":"Approximately 20 minutes by bus from Kurayoshi Station"},"湯原温泉":{"name":"Yubara Onsen","desc":"A secret hot spring in Okayama that is famous for being one of Japan's three largest open-air baths, \"Sunayu.\" There is a free mixed open-air bath along the clear stream of the Asahi River, where you can enjoy the hot springs while enjoying the natural beauty of each season.","quality":"Alkaline simple hot spring","effect":"Beautiful skin, fatigue recovery, neuralgia, chronic skin disease","season":"All year round (especially beautiful during the autumn leaves season)","access":"Near Yubara IC, about 40 minutes by car from Tsuyama Station"},"奥津温泉":{"name":"Okutsu Onsen","desc":"A famous hot spring springing up in the mountains of Okayama Prefecture. This is an original Japanese landscape where the culture of ``foot washing'', where washing is carried out by foot from the bedrock along the river, is still passed down to this day.","quality":"Alkaline simple hot spring","effect":"Beautiful skin, fatigue recovery, neuralgia","season":"All year round","access":"Approximately 50 minutes by car from Tsuyama Station"},"湯田温泉":{"name":"Yuda Onsen","desc":"A famous hot spring in the San'in region that springs up in Yamaguchi City. This is the hometown of Chuya Nakahara, and a hot spring area where the legend of the white fox remains. The convenience of being located in the city center as a sightseeing base in Yamaguchi is also appealing.","quality":"Alkaline simple hot spring","effect":"Beautiful skin, recovery from fatigue, neuralgia, chronic digestive diseases","season":"All year round","access":"Approximately 15 minutes walk from Yamaguchi Station"},"長門湯本温泉":{"name":"Nagato Yumoto Onsen","desc":"The best hot spring area in Yamaguchi Prefecture. This atmospheric hot spring town with inns lined up along the Otogawa River is rapidly gaining attention after undergoing a large-scale renovation in 2019.","quality":"Alkaline simple hot spring","effect":"Beautiful skin, fatigue recovery, neuralgia","season":"All year round","access":"Short walk from Nagato Yumoto Station"},"玉造温泉":{"name":"Tamatsukuri Onsen","desc":"The oldest hot spring in the San'in region, which is also recorded in the Izumo no Kuni Fudoki. It is said to have a beautiful skin effect that is said to ``soak your skin for three days and it will become seven whites.'' Since ancient times, many travelers visit Izumo Taisha Shrine, the ``god of matchmaking.''","quality":"Alkaline simple hot spring","effect":"Beautiful skin, recovery from fatigue, neuralgia, chronic women's diseases","season":"All year round","access":"Approximately 10 minutes walk from Tamatsukuri Onsen Station"},"湯郷温泉":{"name":"Yunogo Onsen","desc":"One of the ``Mimasaka Three Hot Springs.'' This hot spring is said to be said to have been discovered by white herons healing their wounds. It is also known as a sports training camp and a mecca for women's soccer.","quality":"Chloride spring/hydrogen carbonate spring","effect":"Fatigue recovery, neuralgia, chronic skin disease, women's disease","season":"All year round","access":"Approximately 15 minutes by car from Mimasakashi Station"},"道後温泉":{"name":"Dogo Onsen","desc":"One of the oldest hot springs in Japan. Dogo Onsen Honkan, the main building built in the Meiji era and the setting for Natsume Soseki's ``Botchan,'' is a nationally designated important cultural property. A symbol of hot springs.","quality":"Alkaline simple hot spring","effect":"Fatigue recovery, neuralgia, chronic digestive diseases, beautiful skin","season":"All year round","access":"Approximately 20 minutes by streetcar from Matsuyama Station"},"こんぴら温泉":{"name":"Konpira Onsen","desc":"A hot spring that springs up in the town in front of Kompira-san, Shikoku's number one power spot. Enjoying the hot springs after visiting the 1368 stone steps is especially special.","quality":"Chloride spring (sodium chloride spring)","effect":"Recovery from fatigue, neuralgia, sensitivity to cold","season":"All year round","access":"Short walk from Kotohira Station"},"祖谷温泉":{"name":"Iya Onsen","desc":"A secret hot spring that springs from Iya Valley, one of Japan's three most unexplored regions. A romantic hot spring area with a beautiful valley surrounded by steep cliffs and the legend of a Heike fugitive. The open-air bath you get off on the cable car has a spectacular view.","quality":"Alkaline simple hot spring","effect":"Beautiful skin, fatigue recovery, neuralgia","season":"All year round (autumn leaves are spectacular)","access":"Approximately 30 minutes by car from Oboke Station"},"鳴門温泉":{"name":"naruto hot spring","desc":"A hot spring area close to the world's three major tidal currents, the Naruto whirlpools. There are some inns where you can see the whirlpools from an open-air bath overlooking the ocean, and it is a tourist hub connecting Shikoku and Awaji Island.","quality":"chloride spring","effect":"Recovery from fatigue, neuralgia, sensitivity to cold","season":"All year round (best time to see the whirlpools at spring tide)","access":"Approximately 15 minutes by bus from Naruto Station"},"足摺温泉":{"name":"Ashizuri Onsen","desc":"A hot spring that springs from Cape Ashizuri in Tosashimizu City, the southernmost tip of Shikoku. A hot spring resort with a spectacular open-air bath overlooking the ocean of the Kuroshio Current and a romantic atmosphere from the end of the Edo period, associated with Ryoma Sakamoto.","quality":"chloride spring","effect":"Recovery from fatigue, sensitivity to cold, neuralgia","season":"All year round (whale watching from April to September)","access":"Approximately 40 minutes by car from Tosashimizu Station"},"別府温泉":{"name":"Beppu hot spring","desc":"Japan's largest hot spring resort, famous for its \"Hell Tour\". Boasting the highest amount of spring water and the highest number of hot springs in Japan, there are eight unique hells dotted around the area, including Chinoike Jigoku.","quality":"Chloride spring, hydrogen carbonate spring, sulfate spring and many others","effect":"Neuralgia, rheumatism, fatigue recovery, chronic skin disease","season":"All year round","access":"Walk/Bus from Beppu Station"},"由布院温泉":{"name":"Yufuin Onsen","desc":"Kyushu's most popular hot spring resort overlooking Mt. Yufu. Yunotsubo Kaido, lined with small general stores and cafes, and Lake Kinrinko, filled with morning mist, are both picturesque.","quality":"Simple hot spring/hydrogen carbonate spring","effect":"Fatigue recovery, neuralgia, chronic digestive diseases, beautiful skin","season":"All year round (the autumn morning mist is especially magical)","access":"A short walk from Yufuin Station"},"黒川温泉":{"name":"Kurokawa Onsen","desc":"A secret hot spring in Kumamoto that is popular for visiting open-air baths using a bathing ticket. The inn, which blends into the mountain village, and the rustic open-air bath surrounded by trees are popular throughout the country.","quality":"Sulfate spring/chloride spring","effect":"Fatigue recovery, neuralgia, rheumatism, chronic skin disease","season":"All year round (Autumn for autumn leaves and winter for snow viewing are popular)","access":"Approximately 40 minutes by car from Aso Station"},"嬉野温泉":{"name":"Ureshino Onsen","desc":"One of Japan's three major hot springs for beautiful skin. The melty hot water, which is rich in baking soda, is said to make your skin smooth. Ureshino tea from Saga Prefecture and tofu dishes are also famous.","quality":"Baking soda spring (sodium hydrogen carbonate spring)","effect":"Beautiful skin, recovery from fatigue, neuralgia, chronic digestive diseases","season":"All year round","access":"Walk/Bus from Ureshino Onsen Station"},"武雄温泉":{"name":"Takeo Onsen","desc":"A famous hot spring in Saga with a history of 1300 years. This is an old hot spring where Siebold also bathed, and the vermilion-painted tower gate is a nationally designated important cultural property. It is also famous for its cultural facility, which has a Tsutaya Bookstore attached to it.","quality":"Hydrogen carbonate spring/chloride spring","effect":"Fatigue recovery, neuralgia, chronic skin disease, beautiful skin","season":"All year round","access":"About 5 minutes walk from Takeo Onsen Station"},"雲仙温泉":{"name":"Unzen hot spring","desc":"A sulfur hot spring that gushes out from Mt. Unzen on the Shimabara Peninsula in Nagasaki Prefecture. This area was designated as Japan's first national park, and the view of Unzen Jigoku with its white smoke rising is fantastic.","quality":"acidic sulfate spring","effect":"Neuralgia, rheumatism, skin diseases, chronic women's diseases","season":"All year round (mysterious foggy autumn)","access":"Approximately 90 minutes by bus from Isahaya Station"},"指宿温泉":{"name":"Ibusuki Onsen","desc":"It is famous for its ``sand bath hot springs,'' which are rare in the world. This unique bathing method involves burying your body in sand heated by the hot springs, and the hot spring ingredients are absorbed through the pores of your entire body, resulting in an excellent sweating effect.","quality":"Chloride spring (sodium chloride spring)","effect":"Recovery from fatigue, neuralgia, sensitivity to cold, digestive disorders","season":"All year round","access":"About 10 minutes walk from Ibusuki Station"},"霧島温泉郷":{"name":"Kirishima hot spring village","desc":"A general term for multiple hot springs that spring up at the foot of the Kirishima Mountain Range. It is famous as the hot spring where Ryoma Sakamoto visited on his honeymoon, and it is standard to combine it with a visit to Kirishima Shrine.","quality":"Sulfate spring, hydrogen carbonate spring, sulfur spring (varies depending on the spring area)","effect":"Neuralgia, rheumatism, fatigue recovery, beautiful skin","season":"All year round (May and June are especially beautiful when the Japanese aquarium is blooming)","access":"Approximately 90 minutes by bus from Kagoshima Chuo Station"},"人吉温泉":{"name":"Hitoyoshi Onsen","desc":"A famous hot spring in Kumamoto where inns are lined up along the Kuma River. Enjoy rafting on Japan's three rapids, the Kuma River, and hot springs, and enjoy the 700-year history of Sagara and the charm of the castle town.","quality":"Chloride spring/hydrogen carbonate spring","effect":"Recovery from fatigue, neuralgia, chronic digestive disorders, sensitivity to cold","season":"All year round (Kuma River rafting is from April to October)","access":"Short walk from Hitoyoshi Station"},"小浜温泉":{"name":"Obama Onsen","desc":"Located at the base of the Unzen Peninsula, it is famous for Japan's longest footbath, ``Hotto Foot 105'' (105m long footbath). The open-air bath with a spectacular view of the sunset over Tachibana Bay is popular.","quality":"Chloride spring (sodium chloride spring)","effect":"Recovery from fatigue, neuralgia, sensitivity to cold","season":"All year round","access":"Approximately 60 minutes by bus from Isahaya Station"},"長湯温泉":{"name":"Nagayu Onsen","desc":"Japan's No. 1 carbonated spring boasts one of the highest carbon dioxide concentrations in the world. It is a medical hot spring that is drinkable and has scientifically proven effects on the heart and blood vessels. It is also nicknamed ``Ramune no Yu''.","quality":"Hydrogen carbonate spring (high concentration carbonate spring)","effect":"High blood pressure, arteriosclerosis, heart disease, fatigue recovery","season":"All year round","access":"Approximately 20 minutes by car from Takeda Station"},"山鹿温泉":{"name":"Yamaga Onsen","desc":"A hot spring in the commercial capital of Kumamoto. The Yamaga Toro Festival is a nationally famous summer festival in the ``Yunomachi'' area, which is a combination of historical buildings such as Yachiyoza and hot springs.","quality":"Alkaline simple hot spring","effect":"Beautiful skin, recovery from fatigue, neuralgia, sensitivity to cold","season":"All year round (August is especially crowded during the lantern festival)","access":"Approximately 90 minutes by bus from Hakata Station"},"平山温泉":{"name":"Hirayama Onsen","desc":"A famous hot spring in the mountain village of Kumamoto known for its ``soft hot water that is gentle on the skin''. Highly alkaline with a pH of over 9.5, this hot spring is popular among hot spring sommeliers for its beautiful skin.","quality":"Alkaline simple hot spring (high pH)","effect":"Beautiful skin, fatigue recovery, neuralgia, chronic skin disease","season":"All year round","access":"Approximately 20 minutes by car from Shin-Tamana Station"},"菊池温泉":{"name":"Kikuchi Onsen","desc":"A hot spring in Kumamoto that springs near the clear stream of Kikuchi Valley. Nature experiences combined with waterfall tours in the lush Kikuchi Valley and hot springs are the perfect combination.","quality":"Alkaline simple hot spring","effect":"Beautiful skin, fatigue recovery, neuralgia","season":"All year round (May to June when the fresh greenery in the valley is beautiful)","access":"Approximately 75 minutes by bus from Kumamoto Station"},"えびの高原温泉":{"name":"Ebino Kogen Onsen","desc":"A highland hot spring at an altitude of 1,200m, the highest in the Kirishima Mountains. Bathing in an open-air bath while looking closely at the fumarole of Mt. Shiratori is an extraordinary experience.","quality":"acidic sulfur spring","effect":"Neuralgia, chronic skin disease, fatigue recovery, rheumatism","season":"All year round (April of Nokaido (phantom cherry blossoms))","access":"Near Ebino IC, about 90 minutes by car from Miyazaki Airport"},"日南青島温泉":{"name":"Nichinan Aoshima Onsen","desc":"A hot spring in Miyazaki near Aoshima, where subtropical plants grow naturally. A resort where you can enjoy an open-air bath overlooking the Pacific Ocean and surfing on the Aoshima Coast, one of Japan's top 100 beaches.","quality":"Chloride spring (sodium chloride spring)","effect":"Recovery from fatigue, sensitivity to cold, neuralgia","season":"All year round (Surfing is good in autumn and winter waves)","access":"A short walk from Aoshima Station"},"西表島温泉":{"name":"Iriomotejima hot spring","desc":"A secret hot spring on Iriomote Island, Okinawa, located at the southwesternmost tip of Japan. This hot spring is surrounded by subtropical jungle and is home to the Iriomote wild cat.","quality":"Chloride spring (sodium chloride spring)","effect":"Recovery from fatigue, neuralgia, sensitivity to cold, chronic skin disease","season":"All year round (best for diving from April to November)","access":"Approximately 40-60 minutes by ferry from Ishigaki Island"},"壁湯温泉":{"name":"Kabeyu Onsen","desc":"A natural open-air bath that springs along a mountain stream in Kokonoe Town, Oita Prefecture. A secret hot spring filled with hot water in a cave-like bathtub carved out of a rock, where you can listen to the sound of the river in the valley while taking a bath.","quality":"Hydrogen carbonate spring (simple hydrogen carbonate spring)","effect":"Fatigue recovery, neuralgia, beautiful skin","season":"All year round (winter snow viewing open air is popular)","access":"Approximately 30 minutes by car from Kusu IC"},"湯平温泉":{"name":"Yunohira Onsen","desc":"A hidden hot spring in Oita with a stone-paved slope and a retro Showa-era hot spring inn. A quiet mountain hot spring area with a hot spring culture that has continued since the Edo period, inviting a wanderlust.","quality":"Chloride spring (sodium chloride spring)","effect":"Fatigue recovery, neuralgia, chronic gastrointestinal disease, women's disease","season":"All year round","access":"Approximately 20 minutes by car from Yufuin Station"},"天ヶ瀬温泉":{"name":"Amagase Onsen","desc":"A hot spring that gushes out in the valley of the Kusu River. Famous for its ``Kawarayu,'' which gushes out from the bedrock on the riverbank, this hot spring area is full of rustic charm and has open-air baths dotted along the river.","quality":"Chloride spring/hydrogen carbonate spring","effect":"Fatigue recovery, neuralgia, chronic women's diseases","season":"All year round (the autumn leaves are especially beautiful)","access":"About 5 minutes walk from Amagase Station"},"地獄温泉（阿蘇）":{"name":"Jigoku Onsen (Aso)","desc":"A secret hot spring for hot springs deep in the mountains at the foot of Mt. Aso. Suzume no Yu, a sulfur spring that has been around since the Meiji era, is a sulfur spring containing gray mud, and is a famous and enduring hot spring that was revived after the 2016 Kumamoto earthquake.","quality":"acidic sulfur spring","effect":"Neuralgia, rheumatism, chronic skin disease, fatigue recovery","season":"All year round","access":"Approximately 30 minutes by car from Aso Station"},"筋湯温泉":{"name":"Sujiyu hot spring","desc":"A highland hot spring that springs up near Kusuikei in the Kokonoe Mountains. It is famous for having the largest number of utaseyus in Japan, and the powerful utaseyus are extremely effective for relieving stiff shoulders and lower back pain.","quality":"Hydrogen carbonate spring (simple hot spring)","effect":"Stiff shoulders, lower back pain, fatigue recovery, neuralgia","season":"All year round (combination with Kokonoe “Yume” Suspension Bridge is popular)","access":"Approximately 20 minutes by car from Kokonoe IC"},"国頭温泉（沖縄）":{"name":"Kunigami Onsen (Okinawa)","desc":"Okinawa's only natural hot spring springs up in Yanbaru (Yanbaru), the northernmost tip of Okinawa's main island. The contrast between the hot springs and the rich subtropical nature close to the habitat of the Yanbaru rail is unusual.","quality":"chloride spring","effect":"Recovery from fatigue, sensitivity to cold, neuralgia","season":"All year round","access":"Approximately 2 hours by car from Naha Airport"}},"zh-TW":{"登別温泉":{"name":"登別溫泉","desc":"北海道最大的溫泉勝地，以「地獄谷」聞名。它擁有多種泉質，是日本熱水量最多的地區之一。養熊場和地獄谷散步道也很受歡迎。","quality":"硫磺泉、鹽泉、明礬泉等9種。","effect":"神經痛、皮膚病、疲勞恢復、風濕病","season":"一年四季（冬季露天浴池雪景別緻）","access":"從登別站搭乘巴士約 15 分鐘"},"洞爺湖温泉":{"name":"洞爺湖溫泉","desc":"位於破火山口湖－洞爺湖畔的溫泉度假村。漫長的夏季煙火表演和遊覽船很受歡迎。也被認證為世界地質公園。","quality":"氯化物泉（氯化鈉泉）","effect":"怕冷、疲倦恢復、神經痛、婦女病","season":"全年（4月至10月最佳）","access":"從洞爺站搭乘巴士約 15 分鐘"},"定山渓温泉":{"name":"定山溪溫泉","desc":"「札幌的奧座敷」距離札幌市內約1小時車程。豐平河河谷內旅館林立，也是著名的紅葉觀賞地。","quality":"氯化物泉/硫酸鹽泉","effect":"疲勞、怕冷、神經痛、割傷恢復","season":"全年（十月在秋葉季節尤其受歡迎）","access":"從札幌車站搭乘巴士約 70 分鐘"},"層雲峡温泉":{"name":"層雲峽溫泉","desc":"大雪山國立公園的門戶。層雲峽的絕壁連綿的美景令人嘆為觀止，冬季的冰瀑布節也很有名。","quality":"氯化物泉（氯化鈉／氯化鈣泉）","effect":"怕冷、疲勞恢復、神經痛、風濕病","season":"全年（冬季冰川、夏季登山季）","access":"從上川站搭乘巴士約 30 分鐘"},"阿寒湖温泉":{"name":"阿寒湖溫泉","desc":"天然紀念物球藻棲息的阿寒湖畔的溫泉。它也是阿伊努文化的中心，您可以在阿伊努村（Ainu kotan）觀看 Koshanbe 和 Iomante 儀式。","quality":"硫酸鹽泉/氯化物泉","effect":"疲勞恢復、神經痛、風濕病、美麗肌膚","season":"全年（4月至11月最佳）","access":"從釧路機場開車約 90 分鐘"},"知床ウトロ温泉":{"name":"知床宇登呂溫泉","desc":"世界自然遺產知床半島的基地的溫泉地。其吸引力在於在舒緩的溫泉中浸泡在流冰、棕熊和白尾鷹等自然力量中的奢華體驗。","quality":"氯化物泉（氯化鈉泉）","effect":"疲勞恢復、怕冷、神經痛","season":"4月至11月（流冰季節的2月至3月尤其有價值）","access":"從女滿別機場開車約 2 小時"},"ニセコ温泉郷":{"name":"新雪谷溫泉村","desc":"新雪谷也以國際滑雪勝地而聞名。俯瞰羊蹄山的露天浴池景色優美，在冬季可以享受粉雪和溫泉，很受歡迎。","quality":"硫磺泉/碳酸氫土泉","effect":"疲勞恢復、神經痛、皮膚病、風濕病","season":"全年（12 月至 3 月滑雪）","access":"從新雪谷站到各溫泉的接駁巴士"},"支笏湖温泉":{"name":"支笏湖溫泉","desc":"支笏湖畔的溫泉，支笏湖是透明超群的破火山口湖。您可以結合獨木舟和潛水等活動來享受它。","quality":"碳酸氫鹽泉","effect":"神經痛、肌肉痛、疲勞恢復、美麗肌膚","season":"全年（冬天的冰雪節非常棒）","access":"從千歲站搭乘巴士約 40 分鐘"},"豊富温泉":{"name":"豐富溫泉","desc":"日本最北端的溫泉地。與石油伴生氣體一起噴湧而出的溫泉，是日本國內罕見的含有石油成分的溫泉，因其對異位性皮膚炎的治療效果而受到關注。","quality":"含油鹽泉（氯化物泉）","effect":"異位性皮膚炎、皮膚病、神經痛","season":"全年","access":"從豐富站開車約 5 分鐘"},"十勝川温泉":{"name":"十勝川溫泉","desc":"作為植物沼澤溫泉而聞名。這是一種罕見的溫泉，含有由古老植物組成的“摩爾”，因其具有美膚效果而被稱為“美容溫泉”。","quality":"沼泉（植物腐植質鹽泉）","effect":"美膚、神經痛、疲勞恢復、慢性皮膚病","season":"全年（與冬季觀賞天鵝相結合很受歡迎）","access":"從帶廣站搭乘巴士約 40 分鐘"},"酸ヶ湯温泉":{"name":"酸湯溫泉","desc":"日本最古老的溫泉之一，位於八甲田山脈。以其名為千人樓的大型檜木混合浴池而聞名。充滿了秘密溫泉的魅力。","quality":"酸性硫磺泉（硫化氫酸性泉）","effect":"風濕病、神經痛、皮膚病、糖尿病","season":"全年（冬季因大雪而成為孤島）","access":"從青森站搭乘巴士約 65 分鐘"},"乳頭温泉郷":{"name":"乳頭溫泉鄉","desc":"秋田縣的秘密溫泉。它以鶴之湯、妙野湯等 7 個獨特的溫泉而聞名。鶴之湯以其美麗的乳白色水而聞名。","quality":"硫磺泉/碳酸氫鹽泉（各旅館有所不同）","effect":"神經痛、風濕、疲勞恢復、美麗肌膚","season":"一年四季（冬天的雪景浴場非常壯觀）","access":"從田澤湖站搭乘巴士約 45 分鐘"},"蔵王温泉":{"name":"藏王溫泉","desc":"山形藏王滑雪場山麓湧出的高酸性溫泉。陰天溫泉和霜凍樹木（冰怪）的結合是冬季的傳統。","quality":"酸性硫酸鹽氯化物泉","effect":"神經痛、肌肉痛、慢性皮膚病、疲勞恢復","season":"全年（冬季霧凇之旅尤其受歡迎）","access":"從山形站搭乘巴士約 40 分鐘"},"鳴子温泉郷":{"name":"鳴子溫泉鄉","desc":"宮城的內廳。擁有日本11種溫泉中的9種的多元化溫泉地。這裡也作為木芥子的產地而聞名。","quality":"硫磺泉、氯化物泉等","effect":"神經痛、風濕、疲勞恢復、美麗肌膚","season":"全年（10月是紅葉最旺的月份）","access":"從鳴子溫泉站步行即可到達"},"銀山温泉":{"name":"銀山溫泉","desc":"宛如明信片般的溫泉小鎮，白銀川沿岸的木造旅館充滿了大正浪漫氣息。晚上煤氣燈照亮的景色就像電影裡的場景。","quality":"氯化物泉/碳酸氫鹽泉","effect":"神經痛、疲勞恢復、怕冷、美麗肌膚","season":"一年四季（冬季雪景最為神奇）","access":"從大石田站搭乘巴士約 40 分鐘"},"花巻温泉郷":{"name":"花卷溫泉鄉","desc":"宮澤賢治的故鄉花卷市的溫泉。這是一個溫泉鄉，您可以享受由大溫泉和花卷溫泉等多個溫泉區組成的溫泉之旅。","quality":"氯化物泉/碳酸氫鹽泉","effect":"神經痛、疲勞恢復、慢性消化系統疾病、怕冷","season":"全年","access":"從花捲站搭乘巴士約 30 分鐘"},"秋保温泉":{"name":"秋保溫泉","desc":"自古以來作為仙台的幕後溫泉而受歡迎的溫泉。秋保大瀧和來峽的自然美景也很吸引人。這裡有許多大型旅館，是仙台觀光的理想據點。","quality":"氯化物泉（氯化鈉泉）","effect":"恢復疲勞、神經痛、怕冷、皮膚病","season":"全年","access":"從仙台站搭乘巴士約 40 分鐘"},"東山温泉":{"name":"東山溫泉","desc":"會津若鬆的著名溫泉，被稱為「會津的內部客廳」。靠近敦賀城，是會津觀光的熱門據點。","quality":"氯化物泉/硫酸鹽泉","effect":"疲勞恢復、神經痛、風濕病、慢性皮膚病","season":"一年四季（尤其是紅葉季節美麗）","access":"從會津若松站搭乘巴士約 10 分鐘"},"飯坂温泉":{"name":"飯坂溫泉","desc":"松尾芭蕉曾造訪過的東北最古老的溫泉之一。溫泉文化在該地區紮根已久，溫泉旅遊以大浴場「鯖小湯」為中心。","quality":"氯化物泉（氯化鈉泉）","effect":"疲勞恢復、神經痛、怕冷、消化系統疾病","season":"全年","access":"距離飯坂溫泉站僅幾步之遙"},"土湯温泉":{"name":"土湯溫泉","desc":"位於福島市西部的溫泉地。這裡也是木芥子的產地，荒川溪谷沿岸散佈著旅館，氣氛寧靜。","quality":"碳酸氫鹽泉/氯化物泉","effect":"神經痛、疲勞恢復、慢性皮膚病、怕冷","season":"全年","access":"從福島站搭乘巴士約 50 分鐘"},"磐梯熱海温泉":{"name":"萬代熱海溫泉","desc":"磐梯山麓五色沼附近的溫泉地。作為郡山市內城區而頗受歡迎，擁有豐富的溫泉水和各種住宿設施。","quality":"氯化物泉/碳酸氫鹽泉","effect":"疲勞恢復、神經痛、風濕、怕冷","season":"全年","access":"距離萬代熱海站僅幾步之遙"},"遠刈田温泉":{"name":"遠刈田溫泉","desc":"藏王山脈山麓的溫泉地。作為小芥子的發源地之一而聞名，它是位於藏王和松島之間的旅遊中心。","quality":"氯化物泉（氯化鈉泉）","effect":"疲勞恢復、神經痛、肌肉痛、美麗肌膚","season":"全年（藏王滑雪季節冬季也很受歡迎）","access":"從白石藏王站搭乘巴士約 30 分鐘"},"夏油温泉":{"name":"夏湯溫泉","desc":"位於岩手縣北上市的秘密溫泉。這座山溫泉以多來源的野生溫泉而聞名，冬季關閉，在這裡您可以享受大湯和瀧之湯等充滿鄉村氣息的露天浴池。","quality":"硫磺泉/碳酸氫鹽泉","effect":"神經痛、風濕病、皮膚病、疲勞恢復","season":"5月至11月（冬季關閉）","access":"從北上站開車約 60 分鐘"},"大鰐温泉":{"name":"大鱷溫泉","desc":"大鱷作為青森縣最好的溫泉地而聞名。自古以來就有「津輕的奧座敷」之稱，可以享受滑雪場和溫泉。","quality":"氯化物泉（氯化鈉泉）","effect":"疲勞恢復、神經痛、風濕、怕冷","season":"全年","access":"距離大鱷溫泉站僅幾步之遙"},"草津温泉":{"name":"草津溫泉","desc":"日本三大名泉之一。它以其高酸性硫磺泉和“湯莫米”文化而聞名。以湯畑為中心的溫泉小鎮充滿優雅氣息，每年接待遊客超過200萬人次。","quality":"酸性氯化物硫酸鹽泉","effect":"皮膚病、糖尿病、神經痛、風濕病","season":"全年（冬季滑雪和夏季綠化都很受歡迎）","access":"從長野原草津口站搭乘巴士約 25 分鐘"},"伊香保温泉":{"name":"伊香保溫泉","desc":"上州著名的溫泉，以石階聞名。它有兩種類型的溫泉：棕金色溫泉和透明白銀溫泉。這也是與德富蘆花有關的地方。","quality":"氯化物硫酸鹽泉（黃金之湯）/碳酸氫鹽泉（白金之湯）","effect":"疲勞恢復、神經痛、婦女疾病、寒顫恢復","season":"全年","access":"從澀川站搭乘巴士約 20 分鐘"},"四万温泉":{"name":"四萬溫泉","desc":"群馬山區的溫泉，據說可以治癒 40,000 種疾病。鈷藍色的積善館建築如夢似幻，據說是宮崎電影的原型。","quality":"氯化物泉/碳酸氫鹽泉","effect":"消化系統疾病、神經痛、疲倦恢復、婦女病","season":"一年四季（新綠和秋葉尤其美麗）","access":"從中之條站搭乘巴士約 40 分鐘"},"水上温泉":{"name":"水上溫泉","desc":"位於利根川源頭的溫泉度假村。有漂流、SL水上等多種活動，冬季滑雪與溫泉的結合很受歡迎。","quality":"氯化物泉（氯化鈉泉）","effect":"疲勞恢復、神經痛、怕冷、風濕病","season":"全年（5月至10月漂流）","access":"從水上站步行/搭乘巴士"},"宝川温泉":{"name":"寶川溫泉","desc":"以擁有日本最大的混浴露天浴池之一而聞名的秘密溫泉。四個大露天浴池總面積超過470㎡。位於水上溫泉村最深處的孤獨旅館。","quality":"氯化物泉","effect":"疲勞恢復、神經痛、風濕病","season":"全年無休（露天雪見特別受歡迎）","access":"從水上站搭乘巴士約 40 分鐘"},"万座温泉":{"name":"萬座溫泉","desc":"海拔1,800m的日本最高的溫泉。硫磺含量特別高，混濁水獨特。有著比草津更深的山裡的秘密溫泉的感覺。","quality":"酸性硫磺泉","effect":"神經痛、風濕病、皮膚病、慢性婦女病","season":"全年（滑雪季節尤其擁擠）","access":"從輕井澤站開車約 50 分鐘"},"箱根温泉":{"name":"箱根溫泉","desc":"首都圈首屈一指的溫泉度假村。可以眺望富士山的露天浴池很受歡迎，這裡有各種溫泉、美術館和壯麗的景色。每年有超過 2000 萬人次參觀。","quality":"氯化物泉、硫酸鹽泉、碳酸氫鹽泉等","effect":"疲勞恢復、神經痛、美膚、怕冷","season":"全年","access":"從新宿搭乘小田急浪漫特快約 90 分鐘"},"熱海温泉":{"name":"熱海溫泉","desc":"日本領先的溫泉度假村之一，位於東海道沿岸的戰略地點。它是德川家康喜愛的著名溫泉，也是熱海海上花火大會和熱海陽光海灘的海濱度假勝地，頗受歡迎。","quality":"氯化物泉（氯化鈉／氯化鈣泉）","effect":"疲勞恢復、神經痛、怕冷、美麗肌膚","season":"全年","access":"從東京搭乘東海道新幹線/兒玉號約 45 分鐘"},"伊東温泉":{"name":"伊東溫泉","desc":"伊豆最大的溫泉勝地。擁有豐富的熱水量（每分鐘3萬公升）和200多個溫泉，據說是日本三大溫泉之一。","quality":"氯化物泉（氯化鈉／氯化鈣泉）","effect":"疲勞、神經痛、肌肉痛、慢性皮膚病恢復","season":"全年","access":"從東京車站搭乘特急大通號約 1 小時 40 分鐘"},"修善寺温泉":{"name":"修善寺溫泉","desc":"伊豆最古老的溫泉。以修善寺為中心的竹林小徑，是個充滿魅力的溫泉小鎮。夏目漱石、川端康成喜愛的文學聖地。","quality":"氯化物泉","effect":"疲勞恢復、神經痛、怕冷、婦女病","season":"一年四季（梅花、櫻花、秋葉以及各季節的美麗）","access":"從修善寺站搭乘巴士約 10 分鐘"},"湯河原温泉":{"name":"湯河原溫泉","desc":"《萬葉集》中記載的古老溫泉。俯瞰相模灣的山丘上旅館星羅棋布，作為東京附近的隱密溫泉而受到文人墨客和藝術家的喜愛。","quality":"氯化物泉（氯化鈉／氯化鈣泉）","effect":"疲勞恢復、神經痛、慢性婦女疾病、寒顫恢復","season":"一年四季（以梅林聞名的二月也很受歡迎）","access":"從湯河原站搭乘巴士約 10 分鐘"},"鬼怒川温泉":{"name":"鬼怒川溫泉","desc":"關東最好的溫泉度假村之一，位於日光深處。鬼怒川河谷中排列著大型旅館，也是遊覽 SL Taiju 和日光東照宮的熱門據點。","quality":"鹼性單純泉","effect":"疲勞恢復、神經痛、風濕、怕冷","season":"全年","access":"從東武日光線鬼怒川溫泉站步行"},"塩原温泉郷":{"name":"鹽原溫泉鄉","desc":"保吉川沿岸分佈著11個溫泉點的溫泉鄉。擁有11種溫泉，溫泉種類繁多，引人注目，甚至曾有「溫泉專家」前來參觀。","quality":"硫酸鹽泉、氯化物泉等11種","effect":"神經痛、疲勞恢復、慢性皮膚病、消化系統疾病","season":"一年四季（十月尤其美麗，有紅葉）","access":"從那須鹽原站搭乘巴士約 50 分鐘"},"那須温泉郷":{"name":"那須溫泉鄉","desc":"位於那須山麓的溫泉勝地。可以享受以雪勝關「鹿浴」為首的各種溫泉的樂趣，與那須高原公園的觀光相結合也很受歡迎。","quality":"酸性硫酸鹽泉/氯化物泉","effect":"神經痛、風濕病、疲勞恢復、皮膚病","season":"一年四季（新綠葉、紅葉、滑雪最受歡迎）","access":"從那須鹽原站搭乘巴士約 45 分鐘"},"石和温泉":{"name":"石和溫泉","desc":"山梨縣最大的溫泉區，位於甲府盆地。葡萄園中散佈著旅館，可以享受美酒與溫泉結合的旅程。還可以欣賞富士山和南阿爾卑斯山的壯麗景色。","quality":"鹼性單純溫泉","effect":"疲勞恢復、神經痛、怕冷、美麗肌膚","season":"全年（秋季尤其適合葡萄和葡萄酒）","access":"距離石和溫泉站僅幾步之遙"},"下呂温泉":{"name":"下呂溫泉","desc":"日本三大名泉之一。這是一座古色古香的溫泉小鎮，飛驒川沿岸旅館鱗次櫛比，清澈無色的碳酸氫鈉泉水對美容肌膚有奇效。","quality":"鹼性單純溫泉（碳酸氫鹽泉）","effect":"美膚、神經痛、疲勞恢復、慢性消化系統疾病","season":"全年","access":"從名古屋站搭乘特急飛鎢號約 1 小時 40 分鐘"},"奥飛騨温泉郷":{"name":"奧飛驒溫泉鄉","desc":"分佈在北阿爾卑斯山麓的五個溫泉區（平湯、福地、新平湯、栃尾、新穗高）的總稱。擁有日本最多的露天浴池。","quality":"單純溫泉、碳酸氫鹽泉、氯化物泉","effect":"疲勞恢復、神經痛、美膚、風濕病","season":"全年（秋天的紅葉和冬天的雪景非常壯觀）","access":"從高山站搭乘巴士約 1 小時"},"白骨温泉":{"name":"白骨溫泉","desc":"據說，在水裡泡3天，3年不感冒。上高地附近的隱密山間溫泉，以其神秘的雲白露天浴池而聞名。","quality":"含硫碳酸氫鈣鎂泉","effect":"疲勞恢復、神經痛、消化系統疾病、皮膚病","season":"4月下旬至11月（冬季部分關閉）","access":"從松本站搭乘巴士約 2 小時"},"野沢温泉":{"name":"野澤溫泉","desc":"信州著名的溫泉，有 13 個公共浴池，名為外湯湯。這裡也是野澤名的誕生地，旅行中最精彩的部分就是在溫泉小鎮散步和參觀公共浴場。冬季滑雪也很受歡迎。","quality":"氯化物泉/硫酸鹽泉","effect":"神經痛、風濕、疲勞恢復、婦女病","season":"全年（十一月至四月滑雪）","access":"從飯山站搭乘巴士約 25 分鐘"},"渋温泉":{"name":"涉溫泉","desc":"長野的一個古老溫泉，以九個露天浴池而聞名。地獄谷雪猴公園的雪景露天浴池中日本獼猴沐浴的景象舉世聞名。","quality":"氯化物泉/硫酸鹽泉","effect":"神經痛、疲勞恢復、慢性皮膚病、風濕病","season":"全年（冬季以雪猴聞名，是旺季）","access":"從湯田中站搭乘巴士約 10 分鐘"},"別所温泉":{"name":"別所溫泉","desc":"以北向觀音而聞名的上田溫泉，也被稱為“信州鎌倉”。亮點包括參觀三個露天浴池和重要文化財產的三層寶塔。","quality":"氯化物泉（氯化鈉泉）","effect":"疲勞恢復、神經痛、風濕病、美麗肌膚","season":"全年","access":"距離別所溫泉站僅幾步之遙"},"諏訪温泉":{"name":"諏訪溫泉","desc":"諏訪湖畔歷史悠久的溫泉地。您可以在全國諏訪神社總社－諏訪大社的山腳下享受日本最古老的神社之一的神社和溫泉。","quality":"氯化物泉（氯化鈉／氯化鈣泉）","effect":"疲勞恢復、神經痛、慢性婦女疾病、寒顫恢復","season":"全年無休（以冬季神社穿越聞名）","access":"距離上詬訪站僅幾步之遙"},"山代温泉":{"name":"山代溫泉","desc":"加賀溫泉鄉的代表溫泉勝地。這座以菊之湯為中心的迷人溫泉小鎮，深受與謝野明子、泉鏡花等眾多文人墨客的喜愛。","quality":"氯化物泉（氯化鈉泉）","effect":"神經痛、疲勞恢復、慢性皮膚病、怕冷","season":"全年","access":"從加賀溫泉站搭乘巴士約 10 分鐘"},"山中温泉":{"name":"山中溫泉","desc":"被鬆尾芭蕉譽為「成功之泉」的加賀著名溫泉。鶴仙溪溪谷中旅館鱗次櫛比，充滿氣氛的溫泉街。這裡也是九谷燒的產地。","quality":"氯化物泉（氯化鈉／氯化鈣泉）","effect":"疲勞恢復、神經痛、慢性消化系統疾病、婦女病","season":"一年四季（山谷裡的秋葉尤其美麗）","access":"從加賀溫泉站搭乘巴士約 25 分鐘"},"片山津温泉":{"name":"片山津溫泉","desc":"發源於芝山形湖畔的加賀溫泉鄉的溫泉勝地。古色古香的溫泉小鎮，可以欣賞到白山的美麗景色和湖中心噴湧的間歇泉。","quality":"氯化物泉（氯化鈉泉）","effect":"疲勞恢復、神經痛、怕冷、美麗肌膚","season":"全年","access":"從加賀溫泉站搭乘巴士約 10 分鐘"},"和倉温泉":{"name":"和倉溫泉","desc":"石川縣最大的溫泉勝地，被譽為「能登的奧座敷」。其魅力在於七尾灣的壯麗景色、豐富的熱水和海鮮。有加賀屋等著名旅館。","quality":"氯化物泉（氯化鈉／氯化鈣泉）","effect":"疲勞、神經痛、慢性皮膚病、怕冷恢復","season":"全年","access":"從和倉溫泉站搭乘巴士約 5 分鐘"},"芦原温泉":{"name":"蘆原溫泉","desc":"北陸的溫泉勝地。靠近越前海岸，可以同時享受來自日本海的新鮮海鮮和溫泉。這裡是蘆原溫泉越前鐵道的終點站，交通便利。","quality":"氯化物泉（氯化鈉／氯化鈣泉）","effect":"疲勞恢復、神經痛、婦女疾病、寒顫恢復","season":"一年四季（冬季是越前蟹的旺季）","access":"從蘆原溫泉站搭乘巴士約 10 分鐘"},"粟津温泉":{"name":"粟津溫泉","desc":"傳說於718年開幕的加賀古溫泉。日本最古老的旅館「星星」就坐落於此，作為溫泉勝地而聞名於世。安靜輕鬆的氛圍。","quality":"氯化物泉（氯化鈉泉）","effect":"疲勞恢復、神經痛、風濕病、慢性消化系統疾病","season":"全年","access":"從小松站搭乘巴士約 30 分鐘"},"越後湯沢温泉":{"name":"越後湯澤溫泉","desc":"川端康成的小說《雪國》的背景。被譽為日本最好的滑雪勝地之一，您可以在越後山脈的雪景中享受溫泉，這將誘惑您前往旅行。","quality":"簡單的溫泉","effect":"疲勞恢復、神經痛、怕冷、美麗肌膚","season":"全年（12 月至 3 月滑雪）","access":"從上越新幹線越後湯澤站步行即到"},"月岡温泉":{"name":"月岡溫泉","desc":"新潟的溫泉區，以翠綠的硫磺泉為特色。有「美容浴場」之稱的溫泉小鎮的美食和藝妓文化也同樣引人入勝。","quality":"含硫氯化鈉泉","effect":"美膚、神經痛、疲勞恢復、慢性皮膚病","season":"全年","access":"從豐坂站搭乘巴士約 35 分鐘"},"城崎温泉":{"name":"城崎溫泉","desc":"因志賀直哉的小說《城崎》而聞名的兵庫縣著名溫泉。這是關西最好的溫泉小鎮，您可以參觀七個公共浴場並穿著浴衣四處走動。","quality":"氯化物泉（氯化鈉泉）","effect":"疲勞恢復、神經痛、慢性婦女疾病、寒顫恢復","season":"一年四季（松葉蟹冬季尤其受歡迎）","access":"距離城崎溫泉站僅幾步之遙"},"有馬温泉":{"name":"有馬溫泉","desc":"日本三大名泉之一。大阪、神戶附近最方便的溫泉度假村。有兩種著名的溫泉類型：「金之湯」（含鐵的棕色溫泉）和「銀之湯」（碳酸泉）。","quality":"含鐵強氯化物泉（金之湯）/碳酸氫鹽泉（銀之湯）","effect":"神經痛、肌肉痛、怕冷、疲勞恢復","season":"全年","access":"距離神戶電鐵有馬溫泉站僅幾步之遙"},"白浜温泉":{"name":"白濱溫泉","desc":"和歌山熊野古道附近的溫泉度假村。一個度假區，擁有以熊貓、圓月島的壯麗景色和白良濱海灘的白色沙灘而聞名的冒險世界。","quality":"氯化物泉（氯化鈉泉）","effect":"疲勞、神經痛、怕冷、慢性皮膚病恢復","season":"全年（夏季特別適合在海灘游泳）","access":"從白濱車站搭乘巴士約10分鐘"},"湯の峰温泉":{"name":"湯之峰溫泉","desc":"日本最古老的溫泉（已有 1800 多年的歷史），徒步熊野古道的參拜者在此沐浴。被登入為世界遺產的壺湯溫泉是一個每天會變色六次的神秘溫泉。","quality":"含硫碳酸氫鈉泉","effect":"疲勞、神經痛、皮膚病、慢性消化系統疾病恢復","season":"全年","access":"從新宮站搭乘巴士約 70 分鐘"},"川湯温泉":{"name":"川湯溫泉","desc":"從大藤川河底湧出的溫泉，是罕見的溫泉地。冬季，築壩而成的「千人樓」（長約50m）成為著名的大型露天浴池。","quality":"碳酸氫鹽泉（小蘇打泉）","effect":"疲勞恢復、神經痛、慢性皮膚病、美麗肌膚","season":"全年無休（千人樓 12 月至 2 月）","access":"從新宮站搭乘巴士約 90 分鐘"},"南紀勝浦温泉":{"name":"南紀勝浦溫泉","desc":"俯瞰太平洋的溫泉度假村。港口城市那智勝浦以其鮪魚捕撈而聞名，也靠近世界遺產那智瀑布。博基洞以其特色的洞穴浴而聞名。","quality":"氯化物泉（氯化鈉泉）","effect":"疲勞恢復、怕冷、神經痛、慢性皮膚病","season":"全年","access":"從紀伊勝浦站步行/乘船"},"湯村温泉（兵庫）":{"name":"湯村溫泉（兵庫縣）","desc":"以在攝氏98度的溫泉「荒湯」中煮雞蛋和蔬菜的文化而聞名。這裡是與松本清張有淵源的山陰地區，也是電視劇《夢千代日記》的拍攝地。","quality":"碳酸氫鹽泉","effect":"疲勞恢復、神經痛、慢性胃腸病、婦女病","season":"全年","access":"從濱坂站搭乘巴士約 20 分鐘"},"龍神温泉":{"name":"龍神溫泉","desc":"日本三大美女之一。它沿著高野龍神天際線湧出，以其強鹼性和美容皮膚而聞名。在幽靜的深山峽谷中享受秘密溫泉的氛圍。","quality":"簡易溫泉（鹼性）","effect":"美膚、恢復疲勞、神經痛、怕冷","season":"一年四季（秋天的紅葉非常壯觀）","access":"從橋本站開車約 80 分鐘"},"洲本温泉":{"name":"洲本溫泉","desc":"淡路島南部的溫泉勝地。您可以欣賞鳴門海峽的壯麗景色和淡路島特產洋蔥和鳴門鯛等海鮮。","quality":"氯化物泉","effect":"疲勞、神經痛、怕冷恢復","season":"全年","access":"從洲本巴士中心出發的巴士/計程車"},"天橋立温泉":{"name":"天橋立溫泉","desc":"位於京都府的溫泉度假村，俯瞰日本三大風景之一的天橋立。從溫泉旅館欣賞沙洲延伸至日本海的天橋立的壯麗景色，這是一種奢華的體驗。","quality":"氯化物泉（氯化鈉／氯化鈣泉）","effect":"疲勞恢復、神經痛、慢性皮膚病、美麗肌膚","season":"全年（秋季，松樹上有美麗的秋葉）","access":"距離天橋立站僅幾步之遙"},"皆生温泉":{"name":"皆生溫泉","desc":"俯瞰日本海的鳥取縣內最大的溫泉度假村。這是源自日本海海底的罕見溫泉，其魅力在於大山的壯麗景色和境港的新鮮海鮮。","quality":"氯化物泉（氯化鈉／氯化鈣泉）","effect":"疲勞、神經痛、怕冷、慢性皮膚病恢復","season":"全年","access":"從米子站搭乘巴士約 15 分鐘"},"三朝温泉":{"name":"三朝溫泉","desc":"世界領先的鐳溫泉之一。它是世界上氡氣含量最高的地方之一，泉水既可飲用又可吸入。這裡也是攀登三德山三佛寺（投入堂）的起點。","quality":"放射性彈簧（鐳彈簧）","effect":"痛風、神經痛、慢性婦女病、關節炎","season":"全年","access":"從倉吉站搭乘巴士約 20 分鐘"},"湯原温泉":{"name":"湯原溫泉","desc":"以日本三大露天浴池之一「砂湯」聞名的岡山秘密溫泉。旭川清澈的溪流沿岸設有免費的混合露天浴池，您可以在這裡一邊泡溫泉，一邊欣賞四季的自然美景。","quality":"鹼性單純溫泉","effect":"美肌、疲勞恢復、神經痛、慢性皮膚病","season":"一年四季（尤其是紅葉季節美麗）","access":"湯原IC附近，從津山站開車約40分鐘"},"奥津温泉":{"name":"奧津溫泉","desc":"誕生於岡山縣山間的著名溫泉。這裡是日本的原始風景，至今仍傳承著從河邊的基岩上步行清洗的「洗腳」文化。","quality":"鹼性單純溫泉","effect":"美肌、疲勞恢復、神經痛","season":"全年","access":"從津山站開車約 50 分鐘"},"湯田温泉":{"name":"湯田溫泉","desc":"發源於山口市的山陰地區著名溫泉。這裡是中原中也的故鄉，也是留存著白狐傳說的溫泉地。作為山口的觀光據點，位於市中心的便利性也很有吸引力。","quality":"鹼性單純溫泉","effect":"美膚、恢復疲勞、神經痛、慢性消化系統疾病","season":"全年","access":"從山口站步行約 15 分鐘"},"長門湯本温泉":{"name":"長門湯本溫泉","desc":"山口縣最好的溫泉區。這個充滿情調的溫泉小鎮，乙川沿岸旅館鱗次櫛比，在2019年進行了大規模整修後，迅速受到關注。","quality":"鹼性單純溫泉","effect":"美肌、疲勞恢復、神經痛","season":"全年","access":"從長門湯本站步行即到"},"玉造温泉":{"name":"玉造溫泉","desc":"出雲之國風土記中也有記載的山陰地區最古老的溫泉。據說有「肌膚浸泡三日，肌膚七白」的美膚效果。自古以來，許多遊客都會參拜「相親之神」出雲大社。","quality":"鹼性單純溫泉","effect":"美麗肌膚、恢復疲勞、神經痛、慢性婦女病","season":"全年","access":"從玉造溫泉站步行約 10 分鐘"},"湯郷温泉":{"name":"湯鄉溫泉","desc":"「美作三大溫泉」之一。據說這個溫泉是白鷺治癒傷口時發現的。它也被稱為運動訓練營和女子足球的聖地。","quality":"氯化物泉/碳酸氫鹽泉","effect":"疲勞恢復、神經痛、慢性皮膚病、婦女病","season":"全年","access":"從美作站開車約 15 分鐘"},"道後温泉":{"name":"道後溫泉","desc":"日本最古老的溫泉之一。道後溫泉本館是明治時代建造的主建築，也是夏目漱石的《少爺》的拍攝地，被指定為國家重要文化財產。溫泉的象徵。","quality":"鹼性單純溫泉","effect":"疲勞恢復、神經痛、慢性消化系統疾病、美麗肌膚","season":"全年","access":"從松山站搭乘路面電車約 20 分鐘"},"こんぴら温泉":{"name":"金比羅溫泉","desc":"四國第一能量勝地金比羅山前的小鎮中湧出的溫泉。參觀完1368級石階後享受溫泉尤為特別。","quality":"氯化物泉（氯化鈉泉）","effect":"疲勞、神經痛、怕冷恢復","season":"全年","access":"距離琴平站僅幾步之遙"},"祖谷温泉":{"name":"祖谷溫泉","desc":"源自日本三大未開發地區之一祖谷溪谷的秘密溫泉。一個浪漫的溫泉區，周圍有美麗的山谷，周圍有陡峭的懸崖，還有平家逃亡者的傳說。搭乘纜車下車的露天浴池可以欣賞到絕美的景色。","quality":"鹼性單純溫泉","effect":"美肌、疲勞恢復、神經痛","season":"一年四季（秋天的紅葉非常壯觀）","access":"從大步危站開車約 30 分鐘"},"鳴門温泉":{"name":"鳴門溫泉","desc":"靠近世界三大潮流鳴門漩渦的溫泉區。有些旅館的露天浴池可以眺望大海，可以看到漩渦，是連接四國和淡路島的旅遊據點。","quality":"氯化物泉","effect":"疲勞、神經痛、怕冷恢復","season":"全年（最佳觀賞漩渦時間為春潮時）","access":"從鳴門站搭乘巴士約 15 分鐘"},"足摺温泉":{"name":"足折溫泉","desc":"從四國最南端土佐清水市的足折岬湧出的溫泉。與坂本龍馬有著淵源的江戶末期浪漫氛圍，擁有俯瞰黑潮大海的壯觀露天浴池的溫泉度假村。","quality":"氯化物泉","effect":"疲勞恢復、怕冷、神經痛","season":"全年（4月至9月賞鯨）","access":"從土佐清水站開車約 40 分鐘"},"別府温泉":{"name":"別府溫泉","desc":"日本最大的溫泉勝地，以「地獄之旅」而聞名。該地區擁有日本最多的泉水量和最多的溫泉數量，周圍分佈著包括茅池地獄在內的八個獨特的地獄。","quality":"氯化物泉、碳酸氫鹽泉、硫酸鹽泉等","effect":"神經痛、風濕病、疲勞恢復、慢性皮膚病","season":"全年","access":"從別府站步行/搭乘巴士"},"由布院温泉":{"name":"由布院溫泉","desc":"俯瞰由布山的九州最受歡迎的溫泉度假村。小雜貨店和咖啡館林立的湯之坪街道和晨霧繚繞的金鱗湖風景如畫。","quality":"單純溫泉/碳酸氫鹽泉","effect":"疲勞恢復、神經痛、慢性消化系統疾病、美麗肌膚","season":"一年四季（秋天的晨霧尤其神奇）","access":"從由布院站步行一小段距離"},"黒川温泉":{"name":"蒙特內哥羅","desc":"熊本的秘密溫泉，以入浴券參觀露天浴池而聞名。融入山村的旅館和綠樹環繞的質樸露天浴池在全國都很受歡迎。","quality":"硫酸鹽泉/氯化物泉","effect":"疲勞恢復、神經痛、風濕病、慢性皮膚病","season":"全年（秋季賞紅葉、冬季賞雪最受歡迎）","access":"從阿蘇站開車約 40 分鐘"},"嬉野温泉":{"name":"嬉野溫泉","desc":"日本三大美膚溫泉之一。富含小蘇打的融化熱水據說可以使皮膚光滑。佐賀縣的嬉野茶和豆腐料理也很有名。","quality":"小蘇打泉（碳酸氫鈉泉）","effect":"美膚、恢復疲勞、神經痛、慢性消化系統疾病","season":"全年","access":"從嬉野溫泉站步行/搭乘巴士"},"武雄温泉":{"name":"武雄溫泉","desc":"擁有1300年歷史的佐賀著名溫泉。這是西博爾德曾沐浴過的古老溫泉，朱紅色的塔門是國家指定的重要文化財產。它也以其文化設施而聞名，其中有一家附屬的蔦屋書店。","quality":"碳酸氫鹽泉/氯化物泉","effect":"疲勞恢復、神經痛、慢性皮膚病、美麗肌膚","season":"全年","access":"從武雄溫泉站步行約5分鐘"},"雲仙温泉":{"name":"雲仙溫泉","desc":"從長崎縣島原半島雲仙山湧出的硫磺溫泉。該地區被指定為日本最早的國立公園，雲仙地獄升起白煙的景色非常美麗。","quality":"酸性硫酸鹽泉","effect":"神經痛、風濕病、皮膚病、慢性婦女病","season":"全年（神秘霧氣的秋季）","access":"從諫早站搭乘巴士約 90 分鐘"},"指宿温泉":{"name":"指宿溫泉","desc":"它以世界罕見的“沙浴溫泉”而聞名。這種獨特的沐浴方法是將身體​​埋入溫泉加熱的沙子中，溫泉成分透過全身毛孔吸收，從而產生極佳的出汗效果。","quality":"氯化物泉（氯化鈉泉）","effect":"疲勞恢復、神經痛、怕冷、消化系統疾病","season":"全年","access":"從指宿站步行約10分鐘"},"霧島温泉郷":{"name":"霧島溫泉鄉","desc":"霧島山脈山麓湧出的多個溫泉的總稱。這裡因坂本龍馬度蜜月時造訪的溫泉而聞名，與參拜霧島神社結合在一起也是標準配備。","quality":"硫酸鹽泉、碳酸氫鹽泉、硫磺泉（因泉地而異）","effect":"神經痛、風濕、疲勞恢復、美麗肌膚","season":"一年四季（5月和6月日本水族館開花時尤其美麗）","access":"從鹿兒島中央站搭乘巴士約 90 分鐘"},"人吉温泉":{"name":"人吉溫泉","desc":"熊本著名的溫泉，球磨川沿岸旅館鱗次櫛比。享受日本三大急流、球磨川、溫泉的漂流，領略相良700年的歷史和城下町的魅力。","quality":"氯化物泉/碳酸氫鹽泉","effect":"疲勞恢復、神經痛、慢性消化功能失調、怕冷","season":"全年無休（球磨川漂流時間為 4 月至 10 月）","access":"從人吉站步行即到"},"小浜温泉":{"name":"小濱溫泉","desc":"位於雲仙半島的山麓，以日本最長的足浴場「Hotto Foot 105」（105m長的足浴場）而聞名。可以欣賞橘灣夕陽美景的露天浴池頗受歡迎。","quality":"氯化物泉（氯化鈉泉）","effect":"疲勞、神經痛、怕冷恢復","season":"全年","access":"從諫早站搭乘巴士約 60 分鐘"},"長湯温泉":{"name":"長湯溫泉","desc":"日本第一碳酸泉水是全世界二氧化碳濃度最高的泉水之一。它是一種可以飲用的醫療溫泉，經科學證明對心臟和血管有功效。它也被暱稱為“彈珠之湯”。","quality":"碳酸氫鹽泉（高濃度碳酸氫鹽泉）","effect":"高血壓、動脈硬化、心臟病、疲勞恢復","season":"全年","access":"從竹田站開車約 20 分鐘"},"山鹿温泉":{"name":"山鹿溫泉","desc":"商業之都熊本的溫泉。山鹿燈節是全國著名的夏季祭典，位於「湯之町」地區，這裡是八千代座和溫泉等歷史建築的結合體。","quality":"鹼性單純溫泉","effect":"美膚、恢復疲勞、神經痛、怕冷","season":"全年（8月元宵節期間尤其擁擠）","access":"從博多站搭乘巴士約 90 分鐘"},"平山温泉":{"name":"平山溫泉","desc":"熊本山村的著名溫泉，以「溫和的溫泉水，溫和的肌膚」聞名。溫泉呈高鹼性，pH值超過9.5，因其美麗的肌膚而深受溫泉侍酒師的歡迎。","quality":"鹼性單純溫泉（高pH值）","effect":"美肌、疲勞恢復、神經痛、慢性皮膚病","season":"全年","access":"從新玉名站開車約 20 分鐘"},"菊池温泉":{"name":"菊池溫泉","desc":"熊本縣的溫泉，發源於菊池溪谷的清流附近。自然體驗與鬱鬱蔥蔥的菊池山谷的瀑布之旅和溫泉相結合，是完美的結合。","quality":"鹼性單純溫泉","effect":"美肌、疲勞恢復、神經痛","season":"全年（5月至6月，山谷綠意盎然，景色優美）","access":"從熊本站搭乘巴士約 75 分鐘"},"えびの高原温泉":{"name":"蝦野高原溫泉","desc":"霧島連山最高海拔1,200m的高原溫泉。一邊泡露天浴池，一邊近距離觀察白鳥山的噴射孔，真是非凡的體驗。","quality":"酸性硫磺泉","effect":"神經痛、慢性皮膚病、疲勞恢復、風濕病","season":"全年（野街道四月（幻櫻））","access":"蝦野IC附近，距離宮崎機場約90分鐘車程"},"日南青島温泉":{"name":"日南青島溫泉","desc":"青島附近宮崎的溫泉，亞熱帶植物自然生長。可以一邊眺望太平洋的露天浴池，一邊在日本百選海灘之一的青島海岸衝浪的度假勝地。","quality":"氯化物泉（氯化鈉泉）","effect":"疲勞恢復、怕冷、神經痛","season":"一年四季（秋冬浪好衝浪）","access":"距離青島站僅幾步之遙"},"西表島温泉":{"name":"西表島溫泉","desc":"位於日本最西南端沖繩西表島的秘密溫泉。這個溫泉周圍環繞著亞熱帶叢林，是西表野貓的家。","quality":"氯化物泉（氯化鈉泉）","effect":"疲勞、神經痛、怕冷、慢性皮膚病恢復","season":"全年（四月至十一月最適合潛水）","access":"從石垣島搭乘渡輪約 40 至 60 分鐘"},"壁湯温泉":{"name":"甲部湯溫泉","desc":"位於大分縣九重町的溪流旁的天然露天浴池。岩石鑿成的洞穴般的浴缸裡充滿了熱水的秘密溫泉，您可以一邊洗澡一邊聆聽山谷中河水的聲音。","quality":"碳酸氫鹽泉（單純碳酸氫鹽泉）","effect":"疲勞恢復、神經痛、美麗肌膚","season":"全年（冬季露天賞雪很受歡迎）","access":"從楠IC開車約30分鐘"},"湯平温泉":{"name":"湯平溫泉","desc":"大分的隱藏溫泉，有石頭鋪成的斜坡和復古的昭和時代的溫泉旅館。幽靜的山間溫泉地，自江戶時代延續至今的溫泉文化，令人流連忘返。","quality":"氯化物泉（氯化鈉泉）","effect":"疲勞恢復、神經痛、慢性胃腸病、婦女病","season":"全年","access":"由布院站開車約 20 分鐘"},"天ヶ瀬温泉":{"name":"天瀨溫泉","desc":"從玖珠川溪谷湧出的溫泉。這個溫泉區以從河岸基岩湧出的「河原湯」而聞名，充滿鄉村魅力，沿河分佈著露天浴池。","quality":"氯化物泉/碳酸氫鹽泉","effect":"疲勞恢復、神經痛、慢性婦女病","season":"一年四季（秋天的紅葉尤其美麗）","access":"從天瀨站步行約5分鐘"},"地獄温泉（阿蘇）":{"name":"地獄溫泉（阿蘇）","desc":"阿蘇山山麓深山溫泉的秘密溫泉。鈴目湯是自明治時代就存在的硫磺泉，是含有灰泥的硫磺泉，是2016年熊本地震後復活的著名且持久的溫泉。","quality":"酸性硫磺泉","effect":"神經痛、風濕病、慢性皮膚病、疲勞恢復","season":"全年","access":"從阿蘇站開車約 30 分鐘"},"筋湯温泉":{"name":"蘇吉湯溫泉","desc":"九重山地的楠溪附近湧出的高原溫泉。這裡以擁有日本最多的歌打湯而聞名，強大的歌打湯對於緩解肩膀僵硬和腰痛非常有效。","quality":"碳酸氫鹽泉（單純溫泉）","effect":"肩膀酸痛、腰痛、疲勞恢復、神經痛","season":"全年無休（與九重「夢」吊橋的組合很受歡迎）","access":"從九重IC駕車約20分鐘"},"国頭温泉（沖縄）":{"name":"國頭溫泉（沖繩）","desc":"沖繩唯一的天然溫泉湧出於沖繩本島最北端的山原（Yanbaru）。溫泉與山原鐵路棲息地附近豐富的亞熱帶自然風光形成鮮明對比。","quality":"氯化物泉","effect":"疲勞恢復、怕冷、神經痛","season":"全年","access":"從那霸機場開車約 2 小時"}},"ko":{"登別温泉":{"name":"노보리베츠 온천","desc":"「지옥 계곡」으로 유명한 홋카이도 최대의 온천지. 다양한 온천수를 자랑하며 일본 굴지의 온수를 자랑한다. 곰 목장과 지옥 계 산책로도 인기.","quality":"유황천, 식염천, 아키오천 등 9종류","effect":"신경통, 피부병, 피로 회복, 류마티스","season":"연중(겨울에는 설경의 노천탕이 일품)","access":"노보리베츠역에서 버스로 약 15분"},"洞爺湖温泉":{"name":"도야코 온천","desc":"칼데라 호수 「토야코」의 호반에 펼쳐지는 온천 리조트. 여름 장기 불꽃놀이와 유람선이 인기. 세계 지오 파크에도 인정.","quality":"염화물천(나트륨염화물천)","effect":"냉증, 피로 회복, 신경통, 부인병","season":"연중(4~10월이 최적)","access":"도야역에서 버스로 약 15분"},"定山渓温泉":{"name":"조잔케이 온천","desc":"삿포로 시내에서 차로 약 1시간의 「삿포로의 안방」. 도요히라강의 계곡을 따라 여관이 늘어서 단풍의 명소로도 유명.","quality":"염화물천·황산염천","effect":"피로 회복 · 냉증 · 신경통 · 절상","season":"연중(단풍기 10월이 특히 인기)","access":"삿포로역에서 버스로 약 70분"},"層雲峡温泉":{"name":"소운쿄 온천","desc":"다이세츠산 국립공원의 입구. 절벽 절벽이 이어지는 소운쿄의 계곡미는 압권으로, 겨울의 「빙폭 축제」도 유명.","quality":"염화물천(나트륨·칼슘염화물천)","effect":"냉증, 피로 회복, 신경통, 류마티스","season":"연중(겨울의 빙폭・여름의 등산 시즌)","access":"카미카와역에서 버스로 약 30분"},"阿寒湖温泉":{"name":"아칸코 온천","desc":"천연 기념물 마리모가 서식하는 아칸 호반의 온천. 아이누 문화의 거점이기도 하며, 아이누코탄(마을)에서 코샨베와 이오만테의 의식을 볼 수 있다.","quality":"황산염천·염화물천","effect":"피로 회복 · 신경통 · 류마티스 · 피부 미용","season":"연중(4~11월이 최고)","access":"구시로 공항에서 차로 약 90분"},"知床ウトロ温泉":{"name":"시레토코 우토로 온천","desc":"세계 자연 유산 「시레토코 반도」의 거점 온천지. 유빙, 곰, 오지로 독수리 등 대자연의 박력을 온천에서 치유하는 호화스러운 체험이 매력.","quality":"염화물천(나트륨염화물천)","effect":"피로 회복 · 냉증 · 신경통","season":"4~11월(유빙기 2~3월은 특히 귀중)","access":"메만베쓰 공항에서 차로 약 2시간"},"ニセコ温泉郷":{"name":"니세코 온천 마을","desc":"국제 스키 리조트로 유명한 니세코. 양발산을 바라보는 노천탕은 절경으로, 파우더 스노우와 온천을 즐길 수 있는 겨울이 인기.","quality":"유황천·중탄산토류천","effect":"피로 회복 · 신경통 · 피부병 · 류마티스","season":"연중(스키는 12~3월)","access":"니세코 역에서 각 온천까지 셔틀 버스"},"支笏湖温泉":{"name":"시코쓰코 온천","desc":"투명도 발군의 칼데라호 「시코쓰호」호반의 온천. 카누나 다이빙 등 액티비티와 함께 ​​즐길 수 있다.","quality":"탄산수소염천","effect":"신경통, 근육통, 피로 회복, 피부 미용","season":"연중(겨울의 「빙기 축제」는 환상적)","access":"치토세역에서 버스로 약 40분"},"豊富温泉":{"name":"도요토미 온천","desc":"일본 최북의 온천지. 석유의 수반 가스와 함께 솟아나는 전국에서도 드문 석유 성분 함유 온천으로 아토피 치료에 효과가 있다고 주목받고 있다.","quality":"함유 식염천(염화물천)","effect":"아토피 성 피부염, 피부병, 신경통","season":"연중","access":"도요토미역에서 차로 약 5분"},"十勝川温泉":{"name":"도카치가와 온천","desc":"식물성 몰 온천으로 유명. 태고의 식물이 퇴적한 「몰」을 포함한 드문 온천으로, 피부 미용 효과가 높아 「미인의 탕」으로 알려져 있다.","quality":"몰천(식물성 부식질 식염천)","effect":"아름다운 피부, 신경통, 피로 회복, 만성 피부병","season":"연중(겨울의 백조 관찰과 조합이 인기)","access":"오비히로역에서 버스로 약 40분"},"酸ヶ湯温泉":{"name":"산가유 온천","desc":"야코다산중에 솟는 일본에서 가장 오래된 유지장의 하나. 천명 목욕이라고 불리는 큰 히바 구조 혼욕 욕조가 유명. 비탕의 정취 듬뿍.","quality":"산성 유황천(함황화수소산성천)","effect":"류마티스, 신경통, 피부병, 당뇨병","season":"연중(겨울은 호설로 육지의 고도에)","access":"아오모리역에서 버스로 약 65분"},"乳頭温泉郷":{"name":"유두 온천 마을","desc":"아키타현의 비탕. 쓰루노유・묘노유 등 개성 풍부한 7탕이 점재하는 온천 순회로 유명. 유백색의 탕이 아름다운 쓰루노유가 특히 유명.","quality":"유황천·탄산수소염천(숙소에 따라 다름)","effect":"신경통, 류마티스, 피로 회복, 아름다운 피부","season":"연중(겨울의 유키미 목욕탕이 절경)","access":"타자와코역에서 버스로 약 45분"},"蔵王温泉":{"name":"자오 온천","desc":"야마가타 자오 스키장 기슭에 솟는 강산성의 온천. 백탁한 물과 수빙(아이스 몬스터)의 콜라보레이션이 겨울의 풍물시.","quality":"산성 황산염염화물천","effect":"신경통, 근육통, 만성 피부병, 피로 회복","season":"연중(겨울의 수빙 투어가 특히 인기)","access":"야마가타역에서 버스로 약 40분"},"鳴子温泉郷":{"name":"나루코 온천향","desc":"미야기의 안방. 일본에 있는 온천질 11종류 중 9종류가 갖추어진 다채로운 온천지. 코케시의 산지로도 유명.","quality":"유황천·염화물천 외 다수","effect":"신경통, 류마티스, 피로 회복, 아름다운 피부","season":"연중(단풍의 10월이 가장 활기찬)","access":"나루코 온천역에서 도보 권내"},"銀山温泉":{"name":"긴잔 온천","desc":"다이쇼 로망 감도는 목조 여관이 시라긴강을 따라 늘어선 그림엽서 같은 온천가. 저녁에 가스등이 켜지는 풍경은 영화처럼.","quality":"염화물천·탄산수소염천","effect":"신경통, 피로 회복, 냉증, 피부 미용","season":"연중(설경의 겨울이 가장 환상적)","access":"오이시다역에서 버스로 약 40분"},"花巻温泉郷":{"name":"하나마키 온천향","desc":"미야자와 겐지의 고향·하나마키시의 온천. 타이온천·하나마키 온천 등 복수의 온천지로 구성된 온천 순회가 즐거운 온천향.","quality":"염화물천·탄산수소염천","effect":"신경통, 피로 회복, 만성 소화병, 냉증","season":"연중","access":"하나 마키 역에서 버스로 약 30 분"},"秋保温泉":{"name":"아키호 온천","desc":"센다이의 안방으로 옛부터 사랑받아 온 온천. 아키호 오오타키나 기소들협 등의 자연미도 매력. 대형 여관이 많이 센다이 관광의 거점에 최적.","quality":"염화물천(나트륨염화물천)","effect":"피로 회복 · 신경통 · 냉증 · 피부병","season":"연중","access":"센다이역에서 버스로 약 40분"},"東山温泉":{"name":"히가시야마 온천","desc":"「아이즈의 안방」으로 알려진 아이즈 와카마츠의 명탕. 쓰루가성에서 가까이, 아이즈 관광의 거점으로서 인기.","quality":"염화물천·황산염천","effect":"피로 회복 · 신경통 · 류마티스 · 만성 피부병","season":"연중(단풍 시즌이 특히 아름다운)","access":"아이즈 와카 마츠 역에서 버스로 약 10 분"},"飯坂温泉":{"name":"이이자카 온천","desc":"마츠오 바쇼도 방문한 도호쿠에서 가장 오래된 온천 중 하나. 공동 목욕탕 ‘사바코유’를 중심으로 한 온천 순회와 옛부터의 온천 문화가 뿌리 내린다.","quality":"염화물천(나트륨염화물천)","effect":"피로 회복 · 신경통 · 냉증 · 소화기 질환","season":"연중","access":"이이자카 온천역에서 도보로 바로"},"土湯温泉":{"name":"흙탕 온천","desc":"후쿠시마시 서방에 위치한 온천지. 코케시 인형의 산지이기도 하며 아라카와 계곡을 따라 여관이 점재하는 차분한 분위기가 특징.","quality":"탄산수소염천·염화물천","effect":"신경통, 피로 회복, 만성 피부병, 냉증","season":"연중","access":"후쿠시마역에서 버스로 약 50분"},"磐梯熱海温泉":{"name":"반다이 아타미 온천","desc":"반다이 산기슭의 고시키누마에도 가까운 온천지. 고리야마시의 안방으로 친숙해져 풍부한 온천량과 다채로운 숙박 시설이 갖추어져 있다.","quality":"염화물천·탄산수소염천","effect":"피로 회복 · 신경통 · 류마티스 · 냉증","season":"연중","access":"반다이 아타미역에서 도보로 바로"},"遠刈田温泉":{"name":"엔카리타 온천","desc":"자오 연봉의 기슭에 솟는 온천지. 고케시 발상지 중 하나로 유명하며 자오와 마츠시마의 중간에있는 관광 거점.","quality":"염화물천(나트륨염화물천)","effect":"피로 회복 · 신경통 · 근육통 · 아름다운 피부","season":"연중(자오 스키 시즌은 겨울도 인기)","access":"시라이시 자오역에서 버스로 약 30분"},"夏油温泉":{"name":"여름 기름 온천","desc":"이와테현 기타가미시의 비탕. 복수의 원천이 솟아나는 야유가 유명하고, 오유·타키노유 등 야취 넘치는 노천탕을 즐길 수 있는 동계 폐쇄의 산의 온천.","quality":"유황천·탄산수소염천","effect":"신경통, 류마티스, 피부병, 피로 회복","season":"5월~11월(동계 폐쇄)","access":"기타가미역에서 차로 약 60분"},"大鰐温泉":{"name":"오와 온천","desc":"아오모리현 제일의 온천지로 유명한 대형. 옛부터 \"쓰가루의 안방\"으로 사랑받아 스키장과 온천을 즐길 수 있다.","quality":"염화물천(나트륨염화물천)","effect":"피로 회복 · 신경통 · 류마티스 · 냉증","season":"연중","access":"오와 온천역에서 도보로 바로"},"草津温泉":{"name":"구사쓰 온천","desc":"「일본 3명탕」의 하나. 강산성의 유황천과 「탕 전나무」문화가 유명. 유바타를 중심으로 한 온천 마을은 풍정 만점으로 연간 200만명 이상이 방문한다.","quality":"산성 염화물 황산염천","effect":"피부병, 당뇨병, 신경통, 류마티스","season":"연중(스키의 겨울・신록의 여름 모두 인기)","access":"나가노하라 구사쓰구치역에서 버스로 약 25분"},"伊香保温泉":{"name":"이카호 온천","desc":"돌계단으로 유명한 조슈의 명탕. 다갈색의 황금탕과 투명한 백은탕의 2종류의 원천을 가진다. 덕후미꽃 연고의 땅이기도 하다.","quality":"염화물 황산염천(황금의 탕)·탄산수소염천(백은의 탕)","effect":"피로 회복 · 신경통 · 부인병 · 냉증","season":"연중","access":"시부카와 역에서 버스로 약 20 분"},"四万温泉":{"name":"시만 온천","desc":"군마의 산악에 솟아나는 「4만의 병을 치유한다」라는 전설의 탕. 푸른 코발트 블루의 적선관이 환상적이며 미야자키 영화의 모델이라고도 불린다.","quality":"염화물천·탄산수소염천","effect":"소화기병, 신경통, 피로 회복, 여성병","season":"연중(신록·단풍이 특히 아름답다)","access":"나카노조역에서 버스로 약 40분"},"水上温泉":{"name":"수상 온천","desc":"도네가와의 원유역에 솟는 온천 리조트. 래프팅과 SL 미나카미 등 액티비티가 풍부하고 겨울 스키와 온천의 조합이 인기.","quality":"염화물천(나트륨염화물천)","effect":"피로 회복 · 신경통 · 냉증 · 류마티스","season":"연중(래프팅은 5~10월)","access":"수상역에서 도보·버스"},"宝川温泉":{"name":"호카와 온천","desc":"일본 최대급의 혼욕 노천탕으로 알려진 비탕. 4개의 대노천탕의 총 면적은 470㎡ 이상. 수상 온천 마을의 가장 안쪽에 위치한 1채 숙소.","quality":"염화물천","effect":"피로 회복 · 신경통 · 류마티스","season":"연중(유키미 노천이 특히 인기)","access":"수상역에서 버스로 약 40분"},"万座温泉":{"name":"만자 온천","desc":"해발 1,800m에 위치한 일본 최고의 온천. 유황 성분이 특히 진하고, 백탁한 물은 독특. 구사쓰보다 더 산속의 비탕감이 있다.","quality":"산성 유황천","effect":"신경통, 류마티스, 피부병, 만성 부인병","season":"연중(스키 시즌은 특히 활기찬)","access":"카루이자와역에서 차로 약 50분"},"箱根温泉":{"name":"하코네 온천","desc":"수도권 제일의 온천 리조트지. 다채로운 천질과 미술관·절경이 갖추어져, 후지산을 바라보는 노천탕이 인기. 연간 2,000만명 이상이 방문한다.","quality":"염화물천·황산염천·탄산수소염천 등 다수","effect":"피로 회복 · 신경통 · 피부 미용 · 냉증","season":"연중","access":"오다큐 로맨스카로 신주쿠에서 약 90분"},"熱海温泉":{"name":"아타미 온천","desc":"도카이도의 요충에 솟는 일본 굴지의 온천지. 도쿠가와 이에야스도 사랑한 명탕으로 아타미 해상 불꽃놀이와 아타미 선 비치 등 해안 리조트로도 인기.","quality":"염화물천(나트륨·칼슘염화물천)","effect":"피로 회복 · 신경통 · 냉증 · 피부 미용","season":"연중","access":"도카이도 신칸센・코다까지 도쿄에서 약 45분"},"伊東温泉":{"name":"이토 온천","desc":"이즈 최대의 온천지. 풍부한 온수(매분 3만 리터)와 200개 이상의 원천을 자랑하며, 「일본 3대 온천」의 하나로 꼽히는 설도.","quality":"염화물천(나트륨·칼슘염화물천)","effect":"피로 회복 · 신경통 · 근육통 · 만성 피부병","season":"연중","access":"도쿄역에서 특급 오도코로 약 1시간 40분"},"修善寺温泉":{"name":"슈젠지 온천","desc":"이즈에서 가장 오래된 온천. 슈젠지를 중심으로 한 죽림의 소경 등 풍정 있는 온천가가 펼쳐진다. 나츠메 소세키와 가와바타 야스나리도 사랑한 문학의 땅.","quality":"염화물천","effect":"피로 회복 · 신경통 · 냉증 · 여성병","season":"연중(매화・벚꽃・단풍과 사계절의 아름다움)","access":"슈젠지역에서 버스로 약 10분"},"湯河原温泉":{"name":"유가와라 온천","desc":"만엽집에도 시전된 후루유. 사가미만을 바라보는 구릉지에 여관이 점재해, 도쿄 근교의 은신처적 온천으로서 문인 묵객에게 사랑받아 왔다.","quality":"염화물천(나트륨·칼슘염화물천)","effect":"피로 회복 · 신경통 · 만성 부인병 · 냉증","season":"연중(매림으로 유명한 2월도 인기)","access":"유가와라역에서 버스로 약 10분"},"鬼怒川温泉":{"name":"기누가와 온천","desc":"닛코의 안쪽에 솟는 관동 유수의 온천 리조트. 기누가와의 계곡을 따라 대형 여관이 늘어서 SL 다이키와 닛코 도쇼구 관광의 거점으로도 인기.","quality":"알칼리성 단순 분수","effect":"피로 회복 · 신경통 · 류마티스 · 냉증","season":"연중","access":"도부 닛코선 기누가와 온천역에서 도보"},"塩原温泉郷":{"name":"시오바라 온천향","desc":"시노가와를 따라 11개의 온천지가 점재하는 온천향. 11종류의 온천질이 갖추어져 있는 “온천 박사”도 방문하는 다양한 탕이 매력.","quality":"황산염천·염화물천 외 11종","effect":"신경통, 피로 회복, 만성 피부병, 소화기 질환","season":"연중(단풍의 10월이 특히 아름다운)","access":"나스시오바라역에서 버스로 약 50분"},"那須温泉郷":{"name":"나스 온천 마을","desc":"나스다케의 기슭에 펼쳐지는 온천 리조트. 살생석의 '가노노유'를 비롯한 다채로운 온천 순회를 즐길 수 있으며, 나스 하이랜드 파크 관광과의 조합도 인기.","quality":"산성 황산염천·염화물천","effect":"신경통, 류마티스, 피로 회복, 피부병","season":"연중(신록·단풍·스키가 인기)","access":"나스시오바라역에서 버스로 약 45분"},"石和温泉":{"name":"이시와 온천","desc":"고후 분지에 솟는 야마나시 현 최대의 온천지. 포도밭 안에 여관이 점재해, 와인과 온천을 조합한 여행을 즐길 수 있다. 후지산・남 알프스의 절경도.","quality":"알칼리성 단순 온천","effect":"피로 회복 · 신경통 · 냉증 · 피부 미용","season":"연중(포도・와인의 가을이 특히 인기)","access":"이시와 온천역에서 도보로 바로"},"下呂温泉":{"name":"게로 온천","desc":"「일본 3명천」의 하나. 히다가와를 따라 여관이 늘어선 풍정 있는 온천가에서 무색 투명한 나트륨 탄산수소염천은 피부 미용 효과가 높다.","quality":"알칼리성 단순 온천(탄산수소염천)","effect":"피부 미용, 신경통, 피로 회복, 만성 소화기 질환","season":"연중","access":"나고야역에서 특급 주름으로 약 1시간 40분"},"奥飛騨温泉郷":{"name":"오쿠히다 온천향","desc":"북 알프스의 기슭에 점재하는 5개의 온천지(히라유·후쿠치·신히라유·도치오·신호타카)의 총칭. 노천탕의 수는 일본 제일을 자랑한다.","quality":"단순 온천·탄산수소염천·염화물천","effect":"피로 회복 · 신경통 · 피부 피부 · 류마티스","season":"연중(단풍의 가을·유키미의 겨울이 절경)","access":"다카야마 역에서 버스로 약 1 시간"},"白骨温泉":{"name":"백골 온천","desc":"「3일 넣으면 3년 감기를 끌지 않는다」라고 하는 백탁의 피부 미용의 탕. 가미코치에 가까운 산악 온천에서, 신비한 백탁색의 야천탕이 유명한 비탕.","quality":"함황 칼슘·마그네슘 탄산수소염천","effect":"피로 회복 · 신경통 · 소화기병 · 피부병","season":"4월 하순~11월(동계는 일부 폐쇄)","access":"마쓰모토역에서 버스로 약 2시간"},"野沢温泉":{"name":"노자와 온천","desc":"공동욕장 「외탕」이 13개 있는 신슈의 명탕. 노자와나의 발상지이기도 하고, 온천가의 산책과 외탕 순회가 여행의 묘미. 겨울에는 스키도 인기.","quality":"염화물천·황산염천","effect":"신경통, 류마티스, 피로 회복, 여성병","season":"연중(스키는 11월~4월)","access":"이이야마역에서 버스로 약 25분"},"渋温泉":{"name":"시부 온천","desc":"9개의 외탕 순회로 유명한 나가노의 후루유. 지옥 골짜기 원숭이 공원의 유키미 노천탕에 들어가는 일본 원숭이의 모습이 세계적으로 유명하다.","quality":"염화물천·황산염천","effect":"신경통, 피로 회복, 만성 피부병, 류마티스","season":"연중(눈 원숭이로 유명한 겨울이 하이 시즌)","access":"유다나카역에서 버스로 약 10분"},"別所温泉":{"name":"벳쇼 온천","desc":"「신슈의 가마쿠라」라고도 불리는 북향 관음으로 유명한 우에다의 온천. 외탕 3곳을 둘러싼 탕 순회와 중요문화재의 삼중탑이 볼거리.","quality":"염화물천(나트륨염화물천)","effect":"피로 회복 · 신경통 · 류마티스 · 피부 미용","season":"연중","access":"벳쇼 온천역에서 도보로 바로"},"諏訪温泉":{"name":"스와 온천","desc":"스와 호반에 솟는 역사 있는 온천지. 전국의 스와 신사의 총 본사 「스와 대사」의 무릎에서 일본에서 가장 오래된 신사 중 하나와 온천을 즐길 수 있다.","quality":"염화물천(나트륨·칼슘염화물천)","effect":"피로 회복 · 신경통 · 만성 부인병 · 냉증","season":"연중(겨울의 신 신도리가 유명)","access":"가미 스와 역에서 도보로 바로"},"山代温泉":{"name":"야마시로 온천","desc":"가가 온천향을 대표하는 온천지. 요사노 아키코와 이즈미가미카 등 많은 문인들에게 사랑 받고 국화탕을 중심으로 한 풍정 있는 온천가가 펼쳐진다.","quality":"염화물천(나트륨염화물천)","effect":"신경통, 피로 회복, 만성 피부병, 냉증","season":"연중","access":"가가 온천역에서 버스로 약 10분"},"山中温泉":{"name":"야마나카 온천","desc":"마츠오 바쇼가 「수승의 탕」이라고 기른 카가의 명탕. 쓰루센케이의 계곡을 따라 여관이 늘어선 정서 풍부한 온천가. 구야야키의 산지이기도 하다.","quality":"염화물천(나트륨·칼슘염화물천)","effect":"피로 회복 · 신경통 · 만성 소화기병 · 여성병","season":"연중(계곡의 단풍이 특히 아름답다)","access":"가가 온천역에서 버스로 약 25분"},"片山津温泉":{"name":"카타야마즈 온천","desc":"시바야마 가타호반에 솟는 가가 온천 마을의 온천지. 호수의 중앙으로 뿜어지는 간헐천과 하쿠산의 전망이 아름답고 정취가 있는 온천의 거리.","quality":"염화물천(나트륨염화물천)","effect":"피로 회복 · 신경통 · 냉증 · 피부 미용","season":"연중","access":"가가 온천역에서 버스로 약 10분"},"和倉温泉":{"name":"와쿠라 온천","desc":"「노토의 안방」으로 알려진 이시카와현 최대의 온천지. 나나오만을 바라보는 절경과 풍부한 온천수, 바다의 행운이 매력. 가가야 등 명료관이 갖추어져 있다.","quality":"염화물천(나트륨·칼슘염화물천)","effect":"피로 회복 · 신경통 · 만성 피부병 · 냉증","season":"연중","access":"와쿠라 온천역에서 버스로 약 5분"},"芦原温泉":{"name":"아시하라 온천","desc":"호쿠리쿠의 온천 리조트. 에치젠 해안에 가까워 일본해의 신선한 해산물과 온천을 동시에 즐길 수 있다. 아시하라 온천 에치젠 철도의 종점에서 액세스도 양호.","quality":"염화물천(나트륨·칼슘염화물천)","effect":"피로 회복 · 신경통 · 부인병 · 냉증","season":"연중(에치젠 게의 겨울이 최성기)","access":"아시하라 온천역에서 버스로 약 10분"},"粟津温泉":{"name":"아와즈 온천","desc":"718년 개탕 전설을 가진 가가의 후루유. 일본에서 가장 오래된 여관 「법사」가 있는 온천지로서 세계적으로도 유명. 조용하고 차분한 분위기.","quality":"염화물천(나트륨염화물천)","effect":"피로 회복 · 신경통 · 류마티스 · 만성 소화기 질환","season":"연중","access":"고마쓰역에서 버스로 약 30분"},"越後湯沢温泉":{"name":"에치고 유자와 온천","desc":"가와바타 야스나리의 소설 「설국」의 무대. 일본 굴지의 스키 리조트로 알려져 에치고의 산들과 설경 속에서 즐기는 온천이 여정을 자아낸다.","quality":"단순 온천","effect":"피로 회복 · 신경통 · 냉증 · 피부 미용","season":"연중(스키는 12~3월)","access":"조에쓰 신칸센 에치고 유자와역에서 도보로 바로"},"月岡温泉":{"name":"쓰키오카 온천","desc":"에메랄드 그린의 유황천이 특징적인 니가타의 온천지. 「미인의 탕」으로 알려져 온천 마을의 먹거리 산책이나 예요 문화도 매력.","quality":"함황 나트륨 염화물 샘","effect":"아름다운 피부, 신경통, 피로 회복, 만성 피부병","season":"연중","access":"도요에 역에서 버스로 약 35 분"},"城崎温泉":{"name":"기노사키 온천","desc":"시가 나오야의 소설 「성의 사키에서」로 유명한 효고의 명탕. 7개의 외탕 순회와 유카타에서 걷는 정서 있는 온천 마을은 간사이 제일.","quality":"염화물천(나트륨염화물천)","effect":"피로 회복 · 신경통 · 만성 부인병 · 냉증","season":"연중(마츠바 게의 겨울이 특히 인기)","access":"기노사키 온천역에서 도보로 바로"},"有馬温泉":{"name":"아리마 온천","desc":"「일본 3명탕」의 하나. 오사카·고베에 가까운 가장 편리한 온천지. 「김의 탕」(철분을 포함한 다갈색)과 「은의 탕」(탄산천)의 2 종류의 탕이 유명.","quality":"함철 강염화물천(금노탕)·탄산수소염천(은노유)","effect":"신경통, 근육통, 냉증, 피로 회복","season":"연중","access":"고베 전철 아리마 온천역에서 도보로 바로"},"白浜温泉":{"name":"시라하마 온천","desc":"구마노 고도에 가까운 와카야마의 온천 리조트. 판다로 유명한 어드벤처 월드, 엔게츠지마의 절경, 시라라하마의 백사장이 갖추어진 리조트지.","quality":"염화물천(나트륨염화물천)","effect":"피로 회복 · 신경통 · 냉증 · 만성 피부병","season":"연중(해수욕의 여름이 특히 활기차다)","access":"시라하마역에서 버스로 약 10분"},"湯の峰温泉":{"name":"유노미네 온천","desc":"구마노 고도를 걸은 참배자가 입욕한 일본에서 가장 오래된 온천(1800년 이상의 역사). 세계유산에 등록된 온천 ‘츠보유’는 하루 6회 탕의 색이 바뀌는 신비의 탕.","quality":"함황 나트륨 탄산수소염천","effect":"피로 회복 · 신경통 · 피부병 · 만성 소화기 질환","season":"연중","access":"신노미야역에서 버스로 약 70분"},"川湯温泉":{"name":"가와유 온천","desc":"대탑강의 강바닥에서 온천이 자분하는 드문 온천지. 겨울에는 강을 멈추고 만드는 '선인탕'(길이 약 50m)이 유명한 대노천탕이 된다.","quality":"탄산수소염천(중조천)","effect":"피로 회복 · 신경통 · 만성 피부병 · 아름다운 피부","season":"연중(선인탕은 12~2월)","access":"신노미야역에서 버스로 약 90분"},"南紀勝浦温泉":{"name":"난키 카츠우라 온천","desc":"태평양을 바라보는 온천지. 참치의 튀김으로 유명한 나치 카츠우라의 항구 마을에서 세계 유산 '나치 폭포'에도 가깝다. 동굴탕이 특징적인 망귀동이 유명.","quality":"염화물천(나트륨염화물천)","effect":"피로 회복 · 냉증 · 신경통 · 만성 피부병","season":"연중","access":"기이 카츠 우라 역에서 도보 · 배"},"湯村温泉（兵庫）":{"name":"유무라 온천(효고)","desc":"98℃의 고온의 탕이 솟아나는 「황탕」으로 계란이나 야채를 삶는 문화가 유명. 산인의 마츠모토 키요하리 연고의 땅에서, 드라마 「유메 치요 일기」의 무대.","quality":"함중 탄산 식염천","effect":"피로 회복 · 신경통 · 만성 위장병 · 부인병","season":"연중","access":"하마사카역에서 버스로 약 20분"},"龍神温泉":{"name":"용신온천","desc":"일본 삼미인의 탕 중 하나. 타카노 류진 스카이 라인을 따라 솟아 알칼리성이 강하고 피부 미용 효과로 유명. 후카야마 유타니의 조용함 속에서 즐기는 비탕의 분위기.","quality":"단순 온천(알칼리성)","effect":"피부 미용, 피로 회복, 신경통, 냉증","season":"연중(단풍의 가을이 절경)","access":"하시모토역에서 차로 약 80분"},"洲本温泉":{"name":"스모토 온천","desc":"아와지시마 남부의 온천 리조트. 나루토 해협을 바라보는 절경과 아와지시마 특산 ​​양파와 나루토 도미 등 해산물을 즐길 수 있다.","quality":"염화물천","effect":"피로 회복 · 신경통 · 냉증","season":"연중","access":"스모토 버스 센터에서 버스 택시"},"天橋立温泉":{"name":"아마노하시다테 온천","desc":"일본 삼경의 하나 「아마노하시다테」를 바라보는 교토부의 온천지. 사슈가 일본해로 뻗어 있는 아마노하시다테의 절경을 온천 숙소에서 바라보는 호화스러운 체험.","quality":"염화물천(나트륨·칼슘염화물천)","effect":"피로 회복 · 신경통 · 만성 피부병 · 아름다운 피부","season":"연중(송나무의 단풍이 아름다운 가을)","access":"아마노하시다테역에서 도보로 바로"},"皆生温泉":{"name":"카이케 온천","desc":"일본해를 바라보는 돗토리현 최대의 온천 리조트. 원천이 일본해의 해저에서 솟아나온다는 드문 온천으로, 오야마의 절경과 신선한 사카이미나토의 해산물이 매력.","quality":"염화물천(나트륨·칼슘염화물천)","effect":"피로 회복 · 신경통 · 냉증 · 만성 피부병","season":"연중","access":"요나고역에서 버스로 약 15분"},"三朝温泉":{"name":"미사사 온천","desc":"세계 유수의 라듐 온천. 라돈 함유량은 세계 굴지로 음천·흡입도 이루어진다. 산토쿠산 산불사(투입당)로의 등산 기점이기도 하다.","quality":"방사능천(라듐천)","effect":"통풍, 신경통, 만성 부인병, 관절염","season":"연중","access":"구라요시역에서 버스로 약 20분"},"湯原温泉":{"name":"유바라 온천","desc":"일본 3대 노천탕 「사탕」으로 유명한 오카야마의 비탕. 아사히카와의 청류를 따라 무료 혼욕 노천탕이 있어, 사계절의 자연미와 함께 탕을 즐길 수 있다.","quality":"알칼리성 단순 온천","effect":"아름다운 피부, 피로 회복, 신경통, 만성 피부병","season":"연중(단풍 시즌이 특히 아름다운)","access":"유바라 IC 근처, 쓰야마 역에서 차로 약 40 분"},"奥津温泉":{"name":"오쿠츠 온천","desc":"오카야마현의 산속에 솟는 유지의 명탕. 강변의 암반에서 발판 세탁을 하는 「발판 세탁」의 문화가 지금도 전해지는 일본의 원풍경.","quality":"알칼리성 단순 온천","effect":"피부 미용, 피로 회복, 신경통","season":"연중","access":"쓰야마역에서 차로 약 50분"},"湯田温泉":{"name":"유다 온천","desc":"야마구치 시내에 솟는 산인의 명탕. 나카하라 나카야의 고향에서 백호 전설이 남는 온천지. 야마구치의 관광 거점으로서 시가지에 있는 편리함도 매력.","quality":"알칼리성 단순 온천","effect":"피부 미용, 피로 회복, 신경통, 만성 소화기 질환","season":"연중","access":"야마구치역에서 도보 약 15분"},"長門湯本温泉":{"name":"나가토 유모토 온천","desc":"야마구치현 제일의 온천지. 오토노부 강을 따라 여관이 늘어선 정서 있는 온천 마을은 2019년 대규모 리뉴얼을 거쳐 주목도가 급상승 중이다.","quality":"알칼리성 단순 온천","effect":"피부 미용, 피로 회복, 신경통","season":"연중","access":"나가토 유모토 역에서 도보로 바로"},"玉造温泉":{"name":"다마쿠리 온천","desc":"「이즈모 국풍 토기」에도 적힌 산인 가장 오래된 온천. '피부에 3일 잠기면 칠백이 된다'라고 칭할 정도의 피부 미용 효과로, 예전보다 '연결의 하나님' 이즈모타이샤와 세트로 방문하는 여행객이 많다.","quality":"알칼리성 단순 온천","effect":"피부 미용, 피로 회복, 신경통, 만성 부인병","season":"연중","access":"다마조 온천역에서 도보 약 10분"},"湯郷温泉":{"name":"유고 온천","desc":"「미사쿠 미유」의 하나. 백로가 상처를 치유하고 있는 것을 발견했다고 하는 백로 전설의 탕. 스포츠 합숙지로도 알려져, 여자 축구의 메카.","quality":"염화물천·탄산수소염천","effect":"피로 회복 · 신경통 · 만성 피부병 · 부인병","season":"연중","access":"미사카시역에서 차로 약 15분"},"道後温泉":{"name":"도고 온천","desc":"일본에서 가장 오래된 온천 중 하나. 나츠메 소세키 「보짱」의 무대에서, 메이지 시대 건축의 본관 「도고 온천 본관」은 국가 지정 중요 문화재. 온천의 상징적 존재.","quality":"알칼리성 단순 온천","effect":"피로 회복·신경통·만성 소화기병·미 피부","season":"연중","access":"마쓰야마역에서 시전으로 약 20분"},"こんぴら温泉":{"name":"곤피라 온천","desc":"시코쿠 제일의 파워 스포트 「금도 히라궁(곤피라씨)」의 몬젠마치에 솟는 온천. 1368단의 돌계단 참배 후에 즐기는 온천은 각별하다.","quality":"염화물천(나트륨염화물천)","effect":"피로 회복 · 신경통 · 냉증","season":"연중","access":"고토히라역에서 도보로 바로"},"祖谷温泉":{"name":"이즈야 온천","desc":"일본 3대 비경의 하나 「이즈야 계곡」에 솟는 비탕. 절벽 절벽의 계곡미와 헤이케의 낙인 전설이 남는 로망 있는 온천지. 케이블카로 내리는 노천탕이 절경.","quality":"알칼리성 단순 온천","effect":"피부 미용, 피로 회복, 신경통","season":"연중(단풍의 가을이 절경)","access":"오보위역에서 차로 약 30분"},"鳴門温泉":{"name":"나루토 온천","desc":"세계 3대 조류 “나루토의 소용돌이”에 가까운 온천지. 바다를 바라보는 노천탕에서 소용돌이를 바라볼 수 있는 숙소도 있어 시코쿠와 아와지시마를 연결하는 관광 거점.","quality":"염화물천","effect":"피로 회복 · 신경통 · 냉증","season":"연중(와오시오의 대조시가 제철)","access":"나루토역에서 버스로 약 15분"},"足摺温泉":{"name":"아시즈리 온천","desc":"시코쿠의 최남단, 도사 시미즈시 아시즈리 곶에 솟는 온천. 쿠로시오의 대해원을 바라보는 절경의 노천탕과 사카모토 료마 연고의 막부 말기 로망이 감도는 온천지.","quality":"염화물천","effect":"피로 회복 · 냉증 · 신경통","season":"연중(고래 워칭은 4~9월)","access":"도사 시미즈역에서 차로 약 40분"},"別府温泉":{"name":"벳푸 온천","desc":"「지옥 순회」로 유명한 일본 최대의 온천지. 용출량·원천수 모두 일본 제일을 자랑해, 「피의 연못 지옥」 등 개성 풍부한 지옥이 8개 점재한다.","quality":"염화물천·탄산수소염천·황산염천 등 다수","effect":"신경통, 류마티스, 피로 회복, 만성 피부병","season":"연중","access":"벳푸 역에서 도보 · 버스"},"由布院温泉":{"name":"유후인 온천","desc":"유후다케를 바라보는 규슈 제일의 인기 온천 리조트. 조용한 잡화점과 카페가 늘어선 탕의 평 가도와 아침 안개가 들어가는 금린호가 풍정 만점.","quality":"단순온천・탄산수소염천","effect":"피로 회복·신경통·만성 소화기병·미 피부","season":"연중(아사기리의 가을이 특히 환상적)","access":"유후인역에서 도보로 바로"},"黒川温泉":{"name":"구로카와 온천","desc":"「입탕 어음」에서의 노천탕 순회가 인기의 구마모토의 비탕. 산리에 녹아든 여관과 목립에 둘러싸인 야취 넘치는 노천탕이 전국적으로 평판.","quality":"황산염천·염화물천","effect":"피로 회복 · 신경통 · 류마티스 · 만성 피부병","season":"연중(단풍의 가을·유키미의 겨울이 인기)","access":"아소역에서 차로 약 40분"},"嬉野温泉":{"name":"우레시노 온천","desc":"「일본 3대 아름다움 피부의 탕」의 하나. 베이킹 소다 성분이 풍부한 토로토로의 탕은 피부가 매끄러워지면 평판. 사가현산 우레시노차와 두부요리도 명산.","quality":"중조천(탄산수소나트륨천)","effect":"피부 미용, 피로 회복, 신경통, 만성 소화기 질환","season":"연중","access":"우레시노 온천역에서 도보, 버스"},"武雄温泉":{"name":"다케오 온천","desc":"1300년의 역사를 가진 사가의 명탕. 시볼트도 입욕한 후루유로, 주홍색의 누문은 나라 지정 중요 문화재. 츠치야 서점이 병설된 문화 시설로도 유명.","quality":"탄산수소염천·염화물천","effect":"피로 회복 · 신경통 · 만성 피부병 · 아름다운 피부","season":"연중","access":"다케오 온천역에서 도보 약 5분"},"雲仙温泉":{"name":"운젠 온천","desc":"나가사키현 시마바라 반도의 운젠다케에 솟는 유황 온천. 일본 최초의 국립공원으로 지정된 에리어에서, 백연 일어나는 「운젠 지옥」의 경관이 환상적.","quality":"산성 황산염천","effect":"신경통, 류마티스, 피부병, 만성 부인병","season":"연중(은뇨로 한 안개가을 신비)","access":"이사하야역에서 버스로 약 90분"},"指宿温泉":{"name":"이부스키 온천","desc":"세계적으로도 드문 '모래찜질 온천'으로 유명. 온천에서 가열된 모래에 몸을 메우는 독특한 입욕법은 전신의 모공에서 온천 성분이 흡수되어 발한 효과가 발군.","quality":"염화물천(나트륨염화물천)","effect":"피로 회복 · 신경통 · 냉증 · 소화기 질환","season":"연중","access":"이부스키역에서 도보 약 10분"},"霧島温泉郷":{"name":"기리시마 온천향","desc":"기리시마 연산의 기슭에 솟는 복수의 온천지의 총칭. 사카모토 료마가 신혼 여행으로 방문한 온천으로 유명하며 기리시마 신궁에 참배하는 것과 함께하는 것이 정평.","quality":"황산염천·탄산수소염천·유황천(천지에 따라 다름)","effect":"신경통, 류마티스, 피로 회복, 아름다운 피부","season":"연중(미야마 키리시마의 5~6월이 특히 아름다운)","access":"가고시마 중앙역에서 버스로 약 90분"},"人吉温泉":{"name":"히토요시 온천","desc":"구마가와를 따라 여관이 늘어선 구마모토의 명탕. 일본 3급류 「구마가와」에서의 래프팅과 온천을 즐길 수 있고, 사가라 700년의 역사와 성시의 풍정이 매력.","quality":"염화물천·탄산수소염천","effect":"피로 회복 · 신경통 · 만성 소화기병 · 냉증","season":"연중(구마가와 내림은 4~10월)","access":"히토요시 역에서 도보로 바로"},"小浜温泉":{"name":"오바마 온천","desc":"운젠 반도의 뿌리에 위치해 일본에서 가장 긴 \"안심하고 105\"(전장 105m의 족탕)이 유명. 타치바나 만에 가라앉는 석양을 바라보는 절경 노천탕이 인기.","quality":"염화물천(나트륨염화물천)","effect":"피로 회복 · 신경통 · 냉증","season":"연중","access":"이사하야역에서 버스로 약 60분"},"長湯温泉":{"name":"나가유 온천","desc":"세계 유수의 탄산 농도를 자랑하는 「일본 제일의 탄산천」. 음천도 할 수 있어 심장·혈관에의 효과가 과학적으로 증명되고 있는 의료탕의 온천. 「라무네노유」의 애칭도.","quality":"탄산수소염천(고농도탄산천)","effect":"고혈압 · 동맥 경화 · 심장병 · 피로 회복","season":"연중","access":"다케다역에서 차로 약 20분"},"山鹿温泉":{"name":"야마가 온천","desc":"구마모토의 상도에 솟는 온천. 야치요자 등 역사적 건조물과 온천이 융합한 「유노마치」에서, 야마가 등롱 축제는 전국적으로 유명한 여름의 제전.","quality":"알칼리성 단순 온천","effect":"피부 미용, 피로 회복, 신경통, 냉증","season":"연중(등롱축제의 8월이 특히 활기차다)","access":"하카타역에서 버스로 약 90분"},"平山温泉":{"name":"히라야마 온천","desc":"구마모토의 야마사토에 솟는 「피부에 상냥한 토로토로의 탕」으로 알려진 아는 사람조차 아는 명탕. pH9.5이상의 고알칼리성으로 「온천 소믈리에」에 인기의 피부 미용의 탕.","quality":"알칼리성 단순 온천(고 pH)","effect":"아름다운 피부, 피로 회복, 신경통, 만성 피부병","season":"연중","access":"신타마나역에서 차로 약 20분"},"菊池温泉":{"name":"기쿠치 온천","desc":"기쿠치 계곡의 청류 근처에 솟는 구마모토의 온천. 푸른 기쿠치 계곡의 폭포 순회와 조합한 자연 체험과 온천은 최고의 조합.","quality":"알칼리성 단순 온천","effect":"피부 미용, 피로 회복, 신경통","season":"연중(계곡의 신록이 아름다운 5~6월)","access":"구마모토역에서 버스로 약 75분"},"えびの高原温泉":{"name":"새우의 고원 온천","desc":"기리시마산계 중에서도 가장 높은 곳에 있는 해발 1,200m의 고원 온천. 백조산의 분기를 가까이 보면서 들어가는 노천탕은 비일상적인 체험.","quality":"산성 유황천","effect":"신경통, 만성 피부병, 피로 회복, 류마티스","season":"연중(노카이도(환상의 벚꽃)의 4월)","access":"새우의 IC 근처 미야자키 공항에서 차로 약 90분"},"日南青島温泉":{"name":"니치난 칭다오 온천","desc":"아열대 식물이 자생하는 「칭다오」의 근처에 솟는 미야자키의 온천. 태평양을 바라보는 노천탕과 일본의 나기사 100선 ‘칭다오 해안’에서 서핑을 즐길 수 있는 리조트.","quality":"염화물천(나트륨염화물천)","effect":"피로 회복 · 냉증 · 신경통","season":"연중(서핑은 가을과 겨울의 파도가 좋다)","access":"칭다오역에서 도보로 바로"},"西表島温泉":{"name":"이리오모테지마 온천","desc":"일본 최남서단에 위치한 오키나와·이리오모테지마의 비탕. 아열대 정글에 둘러싸인 야취 넘치는 온천으로, 일리오 모테야마네코의 서식지이기도 하다.","quality":"염화물천(나트륨염화물천)","effect":"피로 회복 · 신경통 · 냉증 · 만성 피부병","season":"연중(다이빙은 4~11월이 최적)","access":"이시가키섬에서 페리로 약 40~60분"},"壁湯温泉":{"name":"벽탕 온천","desc":"오이타현 구에초의 계류를 따라 솟는 천연의 노천탕. 바위를 뚫은 동굴 모양의 욕조에 물이 쏟아져 계곡의 강 소리를 들으면서 입욕할 수 있는 비탕.","quality":"탄산수소염천(단순탄산수소염천)","effect":"피로 회복 · 신경통 · 아름다운 피부","season":"연중(겨울의 유키미 노천이 인기)","access":"구주 IC에서 차로 약 30분"},"湯平温泉":{"name":"유히라 온천","desc":"자갈길의 비탈길과 쇼와 레트로한 온천 숙소가 정서 풍부한 오이타의 비탕. 에도 시대부터 이어지는 유지 문화가 남아, 여정을 초대하는 조용한 산의 온천지.","quality":"염화물천(나트륨염화물천)","effect":"피로 회복 · 신경통 · 만성 위장병 · 부인병","season":"연중","access":"유후인역에서 차로 약 20분"},"天ヶ瀬温泉":{"name":"아마가세 온천","desc":"구스가와의 계곡에 솟아나는 온천. 강변의 암반에서 자분하는 '가와라유'가 유명하고, 강변에 노천탕이 점재하는 야취 넘치는 온천지.","quality":"염화물천·탄산수소염천","effect":"피로 회복 · 신경통 · 만성 부인병","season":"연중(단풍의 가을이 특히 아름답다)","access":"아마가세역에서 도보 약 5분"},"地獄温泉（阿蘇）":{"name":"지옥 온천 (아소)","desc":"아소 산기슭의 심산에 솟는 유지의 비탕. 메이지 시대부터 이어지는 「스즈메노유」는 회색 진흙을 포함한 유황천으로, 2016년 구마모토 지진에서 부활한 불굴의 명탕.","quality":"산성 유황천","effect":"신경통, 류마티스, 만성 피부병, 피로 회복","season":"연중","access":"아소역에서 차로 약 30분"},"筋湯温泉":{"name":"근탕 온천","desc":"구중연산의 규취계 근처에 솟는 고원온천. 치는 물의 수가 일본 제일 많은 것으로 유명하고, 강력한 치는 물은 어깨 결림 · 요통에 절대적인 효과.","quality":"탄산수소염천(단순온천)","effect":"어깨 결림, 요통, 피로 회복, 신경통","season":"연중(구중 「꿈」 현교와의 조합이 인기)","access":"구에 IC에서 차로 약 20 분"},"国頭温泉（沖縄）":{"name":"구니가미 온천(오키나와)","desc":"오키나와 본섬 최북단의 얀바루(야마바라)에 솟는 오키나와 유일의 천연 온천. 얀발쿠이나의 서식지에 가까운 풍부한 아열대의 자연과 온천의 대비가 드물다.","quality":"염화물천","effect":"피로 회복 · 냉증 · 신경통","season":"연중","access":"나하 공항에서 차로 약 2시간"}}};</script>
+<script>(function(){
+const kind=MULTILINGUAL_KIND,data=kind==='scenic'?spots:onsen;
+const REGION_I18N={
+ en:{'北海道':'Hokkaido','東北':'Tohoku','関東':'Kanto','関東・甲信越':'Kanto & Koshinetsu','中部':'Chubu','中部・北陸':'Chubu & Hokuriku','近畿':'Kinki','中国':'Chugoku','四国':'Shikoku','九州・沖縄':'Kyushu & Okinawa'},
+ 'zh-TW':{'北海道':'北海道','東北':'東北','関東':'關東','関東・甲信越':'關東・甲信越','中部':'中部','中部・北陸':'中部・北陸','近畿':'近畿','中国':'中國','四国':'四國','九州・沖縄':'九州・沖繩'},
+ ko:{'北海道':'홋카이도','東北':'도호쿠','関東':'간토','関東・甲信越':'간토·고신에쓰','中部':'주부','中部・北陸':'주부·호쿠리쿠','近畿':'긴키','中国':'주고쿠','四国':'시코쿠','九州・沖縄':'규슈·오키나와'}
+};
+const UI={
+ja:{title:kind==='scenic'?'🗾 日本 絶景マップ':'🛁 日本 温泉地マップ',subtitle:'スポットをクリックして詳細を見る',locate:'◎ 現在地',saved:'♡ 保存・計画',share:'⇧ 共有',search:kind==='scenic'?'地名・都道府県・温泉・紅葉など':'温泉名・泉質・効能・地域など',conditions:'⚙ 条件',list:'☷ 一覧',all:'すべて',visited:'訪問済み',unvisited:'未訪問',achieved:'達成',close:'閉じる',reset:'条件をリセット',wishOnly:'行きたいのみ',unvisitedOnly:'未訪問のみ',nowOnly:kind==='scenic'?'今が見頃':'今の季節向き',wish:'♡ 行きたい',wished:'♥ 行きたい済み',plan:'＋ 旅行計画',route:'↗ 経路',spotShare:'共有',fallback:'🔎 公式リンクが開かない場合はこちら',official:kind==='scenic'?'公式サイト・詳細情報を見る':'🔗 公式サイトを見る',memo:kind==='scenic'?'訪問メモ':'入浴・旅行メモ',saveMemo:'メモを保存',photo:'写真を追加',weather:kind==='scenic'?'今日の観賞情報':'今日の温泉旅情報',loading:'天気情報を取得中…',weatherFail:'天気情報を取得できませんでした。公式情報をご確認ください。',savedTitle:kind==='scenic'?'保存・旅行計画':'保存・温泉旅行計画',wishes:'行きたい',trip:'旅行計画',dataTitle:'共有・バックアップ',copyLink:'共有リンクをコピー',export:'JSONを書き出す',import:'JSONを読み込む',clear:'保存データを消去',emptyWish:'まだ「行きたい」はありません。',emptyPlan:kind==='scenic'?'旅行計画は空です。スポット詳細から追加できます。':'旅行計画は空です。温泉詳細から追加できます。',toPlan:'計画へ',remove:'削除',nextDay:'翌日へ',openRoute:'選択地点を経路で開く',copyPlan:'計画をコピー',day:'日目',seasonPrefix:'📅 ベストシーズン：',access:'アクセス',quality:'泉質',effect:'効能',season:'シーズン',resultUnit:'件',noResults:kind==='scenic'?'条件に合うスポットがありません。':'条件に合う温泉がありません。'},
+en:{title:kind==='scenic'?'🗾 Japan Scenic Map':'🛁 Japan Hot Spring Map',subtitle:'Select a marker to view details',locate:'◎ Near me',saved:'♡ Saved & Trips',share:'⇧ Share',search:kind==='scenic'?'Search places, regions, autumn colors…':'Search hot springs, water types, benefits…',conditions:'⚙ Filters',list:'☷ List',all:'All',visited:'Visited',unvisited:'Not visited',achieved:'complete',close:'Close',reset:'Reset filters',wishOnly:'Saved only',unvisitedOnly:'Not visited only',nowOnly:kind==='scenic'?'Best now':'Good this season',wish:'♡ Save',wished:'♥ Saved',plan:'+ Add to trip',route:'↗ Directions',spotShare:'Share',fallback:'🔎 Find current official information',official:'Official information',memo:kind==='scenic'?'Visit notes':'Bath & travel notes',saveMemo:'Save notes',photo:'Add photo',weather:kind==='scenic'?"Today's viewing conditions":"Today's travel weather",loading:'Loading weather…',weatherFail:'Weather is unavailable. Please check official information.',savedTitle:kind==='scenic'?'Saved Places & Trip Plan':'Saved Hot Springs & Trip Plan',wishes:'Saved',trip:'Trip plan',dataTitle:'Share & Backup',copyLink:'Copy share link',export:'Export JSON',import:'Import JSON',clear:'Delete saved data',emptyWish:'No saved places yet.',emptyPlan:'Your trip plan is empty.',toPlan:'Add',remove:'Remove',nextDay:'Next day',openRoute:'Open route',copyPlan:'Copy plan',day:'Day',seasonPrefix:'📅 Best season: ',access:'Access',quality:'Water type',effect:'Reported benefits',season:'Season',resultUnit:'results',noResults:'No matching locations.'},
+'zh-TW':{title:kind==='scenic'?'🗾 日本絕景地圖':'🛁 日本溫泉地圖',subtitle:'點選地標查看詳細資訊',locate:'◎ 目前位置',saved:'♡ 收藏・行程',share:'⇧ 分享',search:kind==='scenic'?'搜尋景點、地區、紅葉等':'搜尋溫泉、泉質、功效、地區等',conditions:'⚙ 篩選',list:'☷ 清單',all:'全部',visited:'已造訪',unvisited:'未造訪',achieved:'完成',close:'關閉',reset:'重設條件',wishOnly:'只看收藏',unvisitedOnly:'只看未造訪',nowOnly:kind==='scenic'?'目前最佳':'適合目前季節',wish:'♡ 收藏',wished:'♥ 已收藏',plan:'＋ 加入行程',route:'↗ 路線',spotShare:'分享',fallback:'🔎 查找最新官方資訊',official:'官方資訊',memo:kind==='scenic'?'造訪筆記':'泡湯・旅行筆記',saveMemo:'儲存筆記',photo:'新增照片',weather:kind==='scenic'?'今日觀賞資訊':'今日旅遊天氣',loading:'正在取得天氣資訊…',weatherFail:'無法取得天氣資訊，請確認官方資訊。',savedTitle:kind==='scenic'?'收藏・旅行計畫':'收藏溫泉・旅行計畫',wishes:'收藏',trip:'旅行計畫',dataTitle:'分享・備份',copyLink:'複製分享連結',export:'匯出 JSON',import:'匯入 JSON',clear:'刪除儲存資料',emptyWish:'尚未收藏任何地點。',emptyPlan:'旅行計畫目前是空的。',toPlan:'加入行程',remove:'刪除',nextDay:'移至翌日',openRoute:'開啟路線',copyPlan:'複製行程',day:'第日',seasonPrefix:'📅 最佳季節：',access:'交通',quality:'泉質',effect:'一般功效',season:'季節',resultUnit:'筆',noResults:'沒有符合條件的地點。'},
+ko:{title:kind==='scenic'?'🗾 일본 절경 지도':'🛁 일본 온천 지도',subtitle:'마커를 선택하면 상세 정보를 볼 수 있습니다',locate:'◎ 현재 위치',saved:'♡ 저장・여행',share:'⇧ 공유',search:kind==='scenic'?'명소, 지역, 단풍 등을 검색':'온천, 수질, 효능, 지역 등을 검색',conditions:'⚙ 필터',list:'☷ 목록',all:'전체',visited:'방문 완료',unvisited:'미방문',achieved:'달성',close:'닫기',reset:'필터 초기화',wishOnly:'저장한 곳만',unvisitedOnly:'미방문만',nowOnly:kind==='scenic'?'지금 절정':'현재 계절 추천',wish:'♡ 저장',wished:'♥ 저장됨',plan:'＋ 여행에 추가',route:'↗ 길찾기',spotShare:'공유',fallback:'🔎 최신 공식 정보 검색',official:'공식 정보',memo:kind==='scenic'?'방문 메모':'입욕・여행 메모',saveMemo:'메모 저장',photo:'사진 추가',weather:kind==='scenic'?'오늘의 관람 정보':'오늘의 여행 날씨',loading:'날씨 정보를 불러오는 중…',weatherFail:'날씨 정보를 가져올 수 없습니다. 공식 정보를 확인하세요.',savedTitle:kind==='scenic'?'저장・여행 계획':'저장 온천・여행 계획',wishes:'저장',trip:'여행 계획',dataTitle:'공유・백업',copyLink:'공유 링크 복사',export:'JSON 내보내기',import:'JSON 가져오기',clear:'저장 데이터 삭제',emptyWish:'저장한 장소가 없습니다.',emptyPlan:'여행 계획이 비어 있습니다.',toPlan:'계획에 추가',remove:'삭제',nextDay:'다음 날',openRoute:'경로 열기',copyPlan:'계획 복사',day:'일차',seasonPrefix:'📅 추천 계절: ',access:'교통',quality:'수질',effect:'일반적 효능',season:'계절',resultUnit:'곳',noResults:'조건에 맞는 장소가 없습니다.'}
+};
+const FILTERS={
+ scenic:{ja:{labels:['季節','景観タイプ','アクセス','並び順'],season:['すべて','春','夏','秋','冬','通年'],type:['すべて','海','山','湖・川','花・紅葉','温泉','歴史・文化','星空・夜景'],access:['すべて','公共交通向き','車向き','徒歩・登山'],sort:['標準','現在地から近い','今が見頃','名前順']},en:{labels:['Season','Scenery','Access','Sort'],season:['All','Spring','Summer','Autumn','Winter','Year-round'],type:['All','Sea','Mountain','Lake / River','Flowers / Autumn colors','Hot spring','History / Culture','Stars / Night view'],access:['All','Public transit','Car','Walking / Hiking'],sort:['Default','Nearest','Best now','Name']},'zh-TW':{labels:['季節','景觀類型','交通','排序'],season:['全部','春','夏','秋','冬','全年'],type:['全部','海洋','山岳','湖泊・河川','花卉・紅葉','溫泉','歷史・文化','星空・夜景'],access:['全部','大眾運輸','開車','步行・登山'],sort:['預設','距離最近','目前最佳','名稱']},ko:{labels:['계절','경관 유형','교통','정렬'],season:['전체','봄','여름','가을','겨울','연중'],type:['전체','바다','산','호수・강','꽃・단풍','온천','역사・문화','별・야경'],access:['전체','대중교통','자동차','도보・등산'],sort:['기본','거리순','지금 절정','이름순']}},
+ onsen:{ja:{labels:['泉質','期待する特徴','季節','アクセス','並び順'],quality:['すべて','硫黄泉','塩化物泉','炭酸水素塩泉','単純泉','酸性泉','硫酸塩泉','放射能泉'],effect:['すべて','美肌','冷え性','神経痛','疲労回復','皮膚病','リウマチ'],season:['すべて','春','夏','秋','冬','通年'],access:['すべて','公共交通向き','車向き','徒歩を含む'],sort:['標準','現在地から近い','今の季節向き','名前順']},en:{labels:['Water type','Features','Season','Access','Sort'],quality:['All','Sulfur','Chloride','Bicarbonate','Simple spring','Acidic','Sulfate','Radioactive'],effect:['All','Skin care','Cold sensitivity','Neuralgia','Fatigue','Skin conditions','Rheumatism'],season:['All','Spring','Summer','Autumn','Winter','Year-round'],access:['All','Public transit','Car','Includes walking'],sort:['Default','Nearest','Good this season','Name']},'zh-TW':{labels:['泉質','特點','季節','交通','排序'],quality:['全部','硫磺泉','氯化物泉','碳酸氫鹽泉','單純泉','酸性泉','硫酸鹽泉','放射能泉'],effect:['全部','美肌','畏寒','神經痛','恢復疲勞','皮膚問題','風濕'],season:['全部','春','夏','秋','冬','全年'],access:['全部','大眾運輸','開車','包含步行'],sort:['預設','距離最近','目前季節推薦','名稱']},ko:{labels:['수질','특징','계절','교통','정렬'],quality:['전체','유황천','염화물천','탄산수소염천','단순천','산성천','황산염천','방사능천'],effect:['전체','피부 관리','냉증','신경통','피로 회복','피부 질환','류머티즘'],season:['전체','봄','여름','가을','겨울','연중'],access:['전체','대중교통','자동차','도보 포함'],sort:['기본','거리순','현재 계절 추천','이름순']}}
+};
+let mapLanguage=localStorage.getItem('japanMapLanguage')||'ja';
+function ui(){return UI[mapLanguage]||UI.ja}function trRegion(r){return mapLanguage==='ja'?r:(REGION_I18N[mapLanguage]?.[r]||r)}
+function trSpot(s){if(mapLanguage==='ja')return s;const x=MULTILINGUAL_TRANSLATIONS[mapLanguage]?.[s.name]||{};return{...s,...x,region:trRegion(s.region)}}
+function setText(id,text){const e=$(id);if(e)e.textContent=text}function setLabel(selectId,text){const e=$(selectId)?.parentElement;if(e&&e.firstChild)e.firstChild.textContent=text}
+function setOptions(id,labels){const e=$(id);if(e)labels.forEach((x,i)=>{if(e.options[i])e.options[i].textContent=x})}
+function applyStatic(){const t=ui();document.documentElement.lang=mapLanguage==='zh-TW'?'zh-Hant':mapLanguage;document.title=t.title.replace(/^[^ ]+ /,'');const h=document.querySelector('header h1');if(h)h.textContent=t.title;const p=document.querySelector('header p');if(p)p.textContent=t.subtitle;setText('locateBtn',t.locate);setText('savedBtn',t.saved);setText('dataBtn',t.share);$('searchInput').placeholder=t.search;setText('advancedToggle',t.conditions);setText('listToggle',t.list);setText('resetFilters',t.reset);setText('closeList',t.close);const lh=document.querySelector('.list-head strong');if(lh)lh.textContent=t.list;const checks=['wishOnly','unvisitedOnly','nowOnly'],checkTexts=[t.wishOnly,t.unvisitedOnly,t.nowOnly];checks.forEach((id,i)=>{const x=$(id)?.parentElement;if(x&&x.lastChild)x.lastChild.textContent=' '+checkTexts[i]});document.querySelectorAll('.sc-label').forEach((e,i)=>e.textContent=i===0?t.visited:t.unvisited);setText('wishBtn',wishes.has(currentSpotName)?t.wished:t.wish);setText('planBtn',t.plan);setText('routeBtn',t.route);setText('spotShareBtn',t.spotShare);setText('fallbackSearchBtn',t.fallback);setText('saveNoteBtn',t.saveMemo);const note=$('spotNote');if(note)note.placeholder=t.memo;const photoLabel=$('photoInput')?.parentElement;if(photoLabel)photoLabel.childNodes[0].textContent=t.photo;const heads=document.querySelectorAll('.drawer-head strong');if(heads[0])heads[0].textContent=t.savedTitle;if(heads[1])heads[1].textContent=t.dataTitle;document.querySelectorAll('.tab-btn').forEach((e,i)=>e.textContent=i?t.trip:t.wishes);setText('copyShareBtn',t.copyLink);setText('exportBtn',t.export);const importLabel=$('importInput')?.parentElement;if(importLabel)importLabel.childNodes[0].textContent=t.import;setText('clearDataBtn',t.clear);document.querySelectorAll('.filter-btn,.region-btn').forEach(b=>b.textContent=b.dataset.region?trRegion(b.dataset.region):t.all);const f=FILTERS[kind][mapLanguage];if(f){const ids=kind==='scenic'?['seasonFilter','typeFilter','accessFilter','sortFilter']:['qualityFilter','effectFilter','seasonFilter','accessFilter','sortFilter'];ids.forEach((id,i)=>setLabel(id,f.labels[i]));Object.entries(f).filter(([k])=>k!=='labels').forEach(([k,v])=>setOptions(k+'Filter',v))}}
+const baseRenderList=renderList;
+renderList=function(){const t=ui(),list=$('spotList');list.innerHTML=filteredSpots.map(s=>{const d=trSpot(s),dist=userPosition?`${Math.round(distanceKm(userPosition,s))}km`:'',badges=kind==='scenic'?[isInSeason(s)?t.nowOnly:'',...(s.tags||[]).slice(0,2)]:[isInSeason(s)?t.nowOnly:'',d.quality?.split(/[・（(]/)[0]];return`<button class="spot-card" data-spot="${s.id}"><h3>${esc(d.name)}</h3><span class="fav">${wishes.has(s.name)?'♥':'♡'}</span><p>${esc(d.region)}${dist?`・${dist}`:''}<br>${esc(d.desc)}</p><span class="mini-tags">${badges.filter(Boolean).map(x=>`<i class="tag">${esc(x)}</i>`).join('')}</span></button>`}).join('')||`<p style="padding:20px;color:#777">${t.noResults}</p>`;list.querySelectorAll('[data-spot]').forEach(b=>b.onclick=()=>{const s=data[+b.dataset.spot];map.setView([s.lat,s.lng],9);$('listPanel').classList.remove('open');$('listToggle').setAttribute('aria-expanded','false');setTimeout(()=>openPanel(s,null),100)})};
+const baseOpenPanel=openPanel;
+function localizePanel(s){const d=trSpot(s),t=ui();setText('panelName',d.name);if(kind==='scenic'){setText('panelDesc',d.desc);setText('panelDetail',d.detail);setText('panelAccess',d.access);setText('panelSeason',t.seasonPrefix+d.season);setText('panelRegion',d.region);const a=$('panelLink');if(a)a.childNodes[a.childNodes.length-1].textContent=' '+t.official}else{setText('panelDesc',d.desc);setText('panelQuality',d.quality);setText('panelEffect',d.effect);setText('panelSeason',d.season);setText('panelAccess',d.access);setText('panelBadge',d.region);const labels=document.querySelectorAll('.panel-detail-row .label');[t.quality,t.effect,t.season,t.access].forEach((x,i)=>{if(labels[i])labels[i].textContent=x});const a=$('panelUrl')?.querySelector('a');if(a)a.textContent='🔗 '+t.official}const photo=$('panelPhoto');if(photo)photo.alt=d.name;updateVisitBtn(s.name);updateWishBtn(s.name)}
+openPanel=function(s,m){baseOpenPanel(s,m);localizePanel(s)};
+const baseUpdateCounter=updateCounter;updateCounter=function(){const t=ui(),n=visited.size,p=Math.round(n/TOTAL*100);setText('visitedCount',n);setText('remainingCount',TOTAL-n);$('progressBar').style.width=p+'%';setText('progressLabel',`${n} / ${TOTAL} ${t.achieved}`)};
+updateVisitBtn=function(name){const t=ui(),on=visited.has(name);$('visitBtn').classList.toggle('visited',on);setText('visitBtnIcon',on?'✓':'☐');setText('visitBtnText',on?t.visited:t.unvisited)};
+updateWishBtn=function(name){setText('wishBtn',wishes.has(name)?ui().wished:ui().wish)};
+const baseToast=toast;toast=function(message){const maps={en:{'行きたいリストに追加しました':'Saved','行きたいリストから外しました':'Removed from saved places','行きたいに追加しました':'Saved','行きたいから外しました':'Removed from saved places','旅行計画に追加しました':'Added to trip','メモを保存しました':'Notes saved','写真を保存しました':'Photo saved','データを読み込みました':'Data imported'},'zh-TW':{'行きたいリストに追加しました':'已收藏','行きたいリストから外しました':'已取消收藏','行きたいに追加しました':'已收藏','行きたいから外しました':'已取消收藏','旅行計画に追加しました':'已加入行程','メモを保存しました':'筆記已儲存','写真を保存しました':'照片已儲存','データを読み込みました':'資料已匯入'},ko:{'行きたいリストに追加しました':'저장했습니다','行きたいリストから外しました':'저장에서 삭제했습니다','行きたいに追加しました':'저장했습니다','行きたいから外しました':'저장에서 삭제했습니다','旅行計画に追加しました':'여행에 추가했습니다','メモを保存しました':'메모를 저장했습니다','写真を保存しました':'사진을 저장했습니다','データを読み込みました':'데이터를 가져왔습니다'}};baseToast(maps[mapLanguage]?.[message]||message)};
+applyFilters=function(){const q=$('searchInput').value.trim().toLowerCase(),season=$('seasonFilter').value,access=$('accessFilter').value;filteredSpots=data.filter(s=>{const d=trSpot(s),hay=(kind==='scenic'?`${s.name} ${s.region} ${s.desc} ${s.detail} ${s.season} ${s.access} ${(s.tags||[]).join(' ')} ${d.name} ${d.region} ${d.desc} ${d.detail} ${d.season} ${d.access}`:`${s.name} ${s.region} ${s.desc} ${s.quality} ${s.effect} ${s.season} ${s.access} ${d.name} ${d.region} ${d.desc} ${d.quality} ${d.effect} ${d.season} ${d.access}`).toLowerCase();let ok=(!currentRegion||s.region===currentRegion)&&(!q||hay.includes(q))&&(!season||(season==='通年'?s.season.includes('通年'):(season===currentSeason()?isInSeason(s):s.season.includes(season))))&&(!access||accessType(s)===access)&&(!$('wishOnly').checked||wishes.has(s.name))&&(!$('unvisitedOnly').checked||!visited.has(s.name))&&(!$('nowOnly').checked||isInSeason(s));if(kind==='scenic')ok=ok&&(!$('typeFilter').value||(s.tags||[]).includes($('typeFilter').value));else ok=ok&&(!$('qualityFilter').value||s.quality.includes($('qualityFilter').value))&&(!$('effectFilter').value||s.effect.includes($('effectFilter').value));return ok});const sort=$('sortFilter').value;if(sort==='distance'&&userPosition)filteredSpots.sort((a,b)=>distanceKm(userPosition,a)-distanceKm(userPosition,b));if(sort==='season')filteredSpots.sort((a,b)=>Number(isInSeason(b))-Number(isInSeason(a)));if(sort==='name')filteredSpots.sort((a,b)=>trSpot(a).name.localeCompare(trSpot(b).name,mapLanguage));setText('resultCount',`${filteredSpots.length} / ${TOTAL} ${ui().resultUnit}`);renderMarkers();renderList();closePanel()};
+const baseRenderSaved=renderSaved;renderSaved=function(){baseRenderSaved();if(mapLanguage==='ja')return;const t=ui(),box=$('savedContent');if(currentTab==='wishes'){const arr=[...wishes].map(spotByName).filter(Boolean);box.innerHTML=arr.length?arr.map(s=>{const d=trSpot(s);return`<div class="saved-item"><span><strong>${esc(d.name)}</strong><br><small>${esc(d.region)}${kind==='onsen'?'・'+esc(d.quality):''}</small></span><span><button class="action-btn" data-add="${s.id}">${t.toPlan}</button><button class="action-btn danger" data-unwish="${s.id}">${t.remove}</button></span></div>`}).join(''):`<p>${t.emptyWish}</p>`;box.querySelectorAll('[data-add]').forEach(b=>b.onclick=()=>addToPlan(data[+b.dataset.add].name));box.querySelectorAll('[data-unwish]').forEach(b=>b.onclick=()=>{wishes.delete(data[+b.dataset.unwish].name);persist(kind==='scenic'?'japanScenicWishes':'japanOnsenWishes',[...wishes]);renderSaved();renderList()});return}if(!tripPlan.length){box.innerHTML=`<p>${t.emptyPlan}</p>`;return}const days=[...new Set(tripPlan.map(x=>x.day))].sort((a,b)=>a-b);box.innerHTML=days.map(day=>`<div class="plan-day">${mapLanguage==='zh-TW'?'第'+day+'天':mapLanguage==='en'?t.day+' '+day:day+t.day}</div>${tripPlan.filter(x=>x.day===day).map(x=>{const s=spotByName(x.name),d=s?trSpot(s):{name:x.name,region:''};return`<div class="plan-item"><span>${esc(d.name)}<br><small>${esc(d.region)}</small></span><span><button class="action-btn" data-day="${esc(x.name)}">${t.nextDay}</button><button class="action-btn danger" data-remove="${esc(x.name)}">${t.remove}</button></span></div>`}).join('')}`).join('')+`<div class="action-row"><button class="action-btn primary" id="routeAll">${t.openRoute}</button><button class="action-btn" id="copyPlan">${t.copyPlan}</button></div>`;box.querySelectorAll('[data-day]').forEach(b=>b.onclick=()=>{const x=tripPlan.find(x=>x.name===b.dataset.day);x.day++;persist(kind==='scenic'?'japanScenicPlan':'japanOnsenPlan',tripPlan);renderSaved()});box.querySelectorAll('[data-remove]').forEach(b=>b.onclick=()=>{tripPlan=tripPlan.filter(x=>x.name!==b.dataset.remove);persist(kind==='scenic'?'japanScenicPlan':'japanOnsenPlan',tripPlan);renderSaved()});$('routeAll').onclick=()=>{const pts=tripPlan.map(x=>spotByName(x.name)).filter(Boolean);if(!pts.length)return;const o=pts[0],d=pts[pts.length-1],w=pts.slice(1,-1).map(s=>`${s.lat},${s.lng}`).join('|');window.open(`https://www.google.com/maps/dir/?api=1&origin=${o.lat},${o.lng}&destination=${d.lat},${d.lng}${w?'&waypoints='+encodeURIComponent(w):''}`,'_blank','noopener')};$('copyPlan').onclick=()=>copyText(days.map(day=>`${day}: `+tripPlan.filter(x=>x.day===day).map(x=>trSpot(spotByName(x.name)).name).join(' → ')).join('\n'),t.copyPlan)};
+async function localizedWeather(s){const t=ui(),names={en:{0:'Clear',1:'Mostly clear',2:'Partly cloudy',3:'Cloudy',45:'Fog',61:'Rain',71:'Snow',80:'Showers',95:'Thunderstorm'},'zh-TW':{0:'晴朗',1:'大致晴朗',2:'局部多雲',3:'陰天',45:'霧',61:'雨',71:'雪',80:'陣雨',95:'雷雨'},ko:{0:'맑음',1:'대체로 맑음',2:'구름 조금',3:'흐림',45:'안개',61:'비',71:'눈',80:'소나기',95:'뇌우'}};setText('liveInfo',t.loading);$('conditionAdvice').innerHTML='';const params=kind==='scenic'?'current=temperature_2m,weather_code,cloud_cover,wind_speed_10m&daily=sunrise,sunset,precipitation_probability_max':'current=temperature_2m,weather_code,precipitation,wind_speed_10m&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max';try{const r=await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${s.lat}&longitude=${s.lng}&${params}&timezone=Asia%2FTokyo&forecast_days=1`);if(!r.ok)throw 0;const d=await r.json(),c=d.current,rain=d.daily.precipitation_probability_max[0],w=names[mapLanguage]?.[c.weather_code]||names[mapLanguage]?.[3];if(kind==='scenic'){const sunrise=d.daily.sunrise[0].slice(11),sunset=d.daily.sunset[0].slice(11),labels=mapLanguage==='en'?['Weather','Temperature','Clouds','Wind','Sunrise','Sunset','Rain']:mapLanguage==='zh-TW'?['天氣','氣溫','雲量','風速','日出','日落','降雨']:['날씨','기온','운량','바람','일출','일몰','강수'];$('liveInfo').innerHTML=`<div class="live-grid"><span>${labels[0]}: ${w}</span><span>${labels[1]}: ${c.temperature_2m}℃</span><span>${labels[2]}: ${c.cloud_cover}%</span><span>${labels[3]}: ${c.wind_speed_10m}km/h</span><span>${labels[4]}: ${sunrise}</span><span>${labels[5]}: ${sunset}</span><span>${labels[6]}: ${rain}%</span></div>`}else{const labels=mapLanguage==='en'?['Weather','Temperature','High','Low','Rain','Wind']:mapLanguage==='zh-TW'?['天氣','氣溫','最高','最低','降雨','風速']:['날씨','기온','최고','최저','강수','바람'];$('liveInfo').innerHTML=`<div class="live-grid"><span>${labels[0]}: ${w}</span><span>${labels[1]}: ${c.temperature_2m}℃</span><span>${labels[2]}: ${d.daily.temperature_2m_max[0]}℃</span><span>${labels[3]}: ${d.daily.temperature_2m_min[0]}℃</span><span>${labels[4]}: ${rain}%</span><span>${labels[5]}: ${c.wind_speed_10m}km/h</span></div>`}}catch{setText('liveInfo',t.weatherFail)}}
+loadLiveInfo=localizedWeather;
+
+// Rebind controls that originally captured the Japanese-only filter function.
+let multilingualSearchTimer;
+$('searchInput').oninput=()=>{clearTimeout(multilingualSearchTimer);multilingualSearchTimer=setTimeout(applyFilters,180)};
+(kind==='scenic'?['seasonFilter','typeFilter','accessFilter','sortFilter']:['qualityFilter','effectFilter','seasonFilter','accessFilter','sortFilter']).forEach(id=>$(id).onchange=applyFilters);
+
+function applyLanguage(lang){mapLanguage=lang;localStorage.setItem('japanMapLanguage',lang);$('languageSelect').value=lang;applyStatic();updateCounter();renderMarkers();renderList();if($('savedDrawer').classList.contains('open'))renderSaved();if(currentSpotName){const s=spotByName(currentSpotName);if(s)localizePanel(s)}}
+window.applyMapLanguage=applyLanguage;
+$('languageSelect').addEventListener('change',e=>applyLanguage(e.target.value));
+applyLanguage(mapLanguage);
+})();
+</script>
+<!-- MULTILINGUAL_END -->
+</body>
+</html>
