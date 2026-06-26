@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>日本 名産・銘菓・定番土産マップ</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<style>
+*{box-sizing:border-box}body{margin:0;height:100vh;overflow:hidden;font-family:"Hiragino Kaku Gothic ProN","Yu Gothic",Meiryo,Arial,sans-serif;background:#f7f3ec;color:#241a12}header{min-height:86px;background:#2d2016;color:#fff;display:flex;align-items:center;gap:12px;padding:10px 14px;box-shadow:0 2px 14px #0004;z-index:500;position:relative;flex-wrap:wrap}header>div:first-child{flex:0 1 380px;min-width:260px;overflow:hidden}h1{font-size:18px;margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.sub{font-size:12px;color:#e9d5bd;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.regionFilters{display:flex;gap:6px;flex:1 1 420px;min-width:0;flex-wrap:nowrap;overflow-x:auto;overflow-y:hidden;margin-left:0;padding-bottom:2px}.regionBtn{border:1px solid #ffffff40;background:#ffffff12;color:#fff;border-radius:999px;padding:7px 11px;font-weight:700;font-size:12px;cursor:pointer;white-space:nowrap;flex:0 0 auto}.regionBtn.active,.regionBtn:hover{background:#d65f2b;border-color:#d65f2b}.tools{display:flex;gap:8px;align-items:center;width:100%;max-width:760px;flex:1 0 100%}.tools input,.tools select{height:38px;border:1px solid #d9cbb9;border-radius:9px;background:#fff;padding:0 10px;font:inherit;min-width:0}.tools input{flex:1}.tools select{width:132px;flex:0 0 auto}.main{height:calc(100vh - 126px);display:flex;position:relative}#map{flex:1;background:#dbe7de}.panel{width:440px;max-width:100%;background:#fff;border-left:1px solid #e0d4c4;box-shadow:-6px 0 24px #0002;display:flex;flex-direction:column;z-index:800}.panelHead{padding:18px 18px 12px;background:#fff7ee;border-bottom:1px solid #ead8c1}.panelHead small{display:inline-block;background:#d65f2b;color:#fff;border-radius:999px;padding:3px 10px;font-weight:700;margin-bottom:8px}.panelHead h2{font-size:23px;margin:0 0 6px}.panelHead p{margin:0;color:#6b5a49;font-size:13px;line-height:1.55}.list{overflow:auto;padding:14px;display:grid;gap:12px}.card{border:1px solid #e4d7c8;border-radius:8px;background:#fff;padding:13px;box-shadow:0 1px 4px #0000000a}.cardTop{display:flex;align-items:flex-start;gap:8px;justify-content:space-between}.card h3{font-size:17px;margin:0 0 5px}.original-name{display:block;margin-top:3px;font-size:11px;font-weight:500;color:#8a725d;line-height:1.35}.tag{display:inline-block;background:#f3e5d6;color:#8b3d19;border-radius:999px;padding:2px 8px;font-size:11px;font-weight:700;white-space:nowrap}.card p{font-size:13px;line-height:1.65;color:#51473d;margin:8px 0 10px}.linkRow{display:flex;gap:7px;flex-wrap:wrap}.linkBtn{display:inline-flex;text-decoration:none;align-items:center;justify-content:center;background:#2d2016;color:#fff;border-radius:8px;padding:8px 10px;font-size:12px;font-weight:700}.linkBtn:hover{background:#d65f2b}.meta{font-size:12px;color:#816f5d}.marker{width:36px;height:36px;border-radius:50%;background:#d65f2b;color:#fff;border:3px solid #fff;box-shadow:0 2px 9px #0005;display:grid;place-items:center;font-weight:900;font-size:13px}.empty{padding:22px;color:#6b5a49;line-height:1.7}.count{font-size:12px;color:#e9d5bd;font-weight:700;white-space:nowrap}.note{font-size:11px;color:#8a725d;margin-top:8px}@media(max-width:980px){h1{font-size:15px}.sub{display:none}header>div:first-child{flex:1 1 220px;min-width:180px}.regionFilters{order:3;width:100%;flex-basis:100%;overflow-x:auto;flex-wrap:nowrap;margin-left:0;padding-bottom:2px}.tools{order:2;max-width:none}.main{height:calc(100vh - 158px)}.panel{position:absolute;right:0;top:0;bottom:0;width:min(410px,92vw)}}@media(max-width:640px){.tools select{width:104px}.main{height:calc(100vh - 190px)}.panel{left:0;right:0;top:auto;height:52%;width:100%;border-left:0;border-top:1px solid #e0d4c4}.panelHead{padding:12px 14px}.panelHead h2{font-size:19px}.list{padding:10px}}
+</style>
+</head>
+<body>
+<header>
+  <div><h1 id="title">日本 名産・銘菓・定番土産マップ</h1><div class="sub" id="subtitle">47都道府県 × 各10件。インバウンド向け多言語表示に対応。</div></div>
+  <div class="count" id="countText">470件掲載</div>
+  <div class="regionFilters" id="regionFilters"></div>
+  <div class="tools">
+    <input id="search" type="search">
+    <select id="category"></select>
+    <select id="language">
+      <option value="ja">日本語</option>
+      <option value="en">English</option>
+      <option value="zh">繁體中文</option>
+      <option value="ko">한국어</option>
+    </select>
+  </div>
+</header>
+<div class="main"><div id="map"></div><aside class="panel"><div class="panelHead" id="panelHead"></div><div class="list" id="list"></div></aside></div>
+<script>
+const catalogText = `
+北海道|北海道・東北|43.064|141.347|白い恋人,ロイズ 生チョコレート,六花亭 マルセイバターサンド,じゃがポックル,夕張メロン,北海道チーズ,いくら醤油漬け,札幌ラーメン,スープカレー,北海道ワイン
+青森県|北海道・東北|40.824|140.740|気になるリンゴ,青森りんご,いちご煮,アップルジュース,せんべい汁,黒にんにく,帆立加工品,津軽びいどろ,嶽きみ,大間まぐろ
+岩手県|北海道・東北|39.704|141.153|かもめの玉子,南部せんべい,盛岡冷麺,わんこそば,前沢牛,小岩井乳製品,福田パン,三陸わかめ,浄法寺塗,りんごジュース
+宮城県|北海道・東北|38.268|140.872|萩の月,笹かまぼこ,牛たん,ずんだ餅,仙台味噌,牡蠣加工品,白石温麺,喜久福,金華さば,仙台麩
+秋田県|北海道・東北|39.718|140.103|金萬,稲庭うどん,きりたんぽ,いぶりがっこ,比内地鶏,ババヘラアイス,秋田美人米,ハタハタ寿司,横手焼きそば,高清水
+山形県|北海道・東北|38.240|140.363|乃し梅,さくらんぼ,米沢牛,だだちゃ豆,山形ラ・フランス,芋煮,玉こんにゃく,山形そば,つや姫,でん六豆
+福島県|北海道・東北|37.750|140.467|ままどおる,柏屋薄皮饅頭,喜多方ラーメン,桃,檸檬,会津みそ,会津漆器,馬刺し,いかにんじん,あわまんじゅう
+茨城県|関東|36.342|140.447|水戸納豆,干し芋,吉原殿中,あんこう鍋,メロン,常陸牛,奥久慈しゃも,笠間焼,栗菓子,れんこん
+栃木県|関東|36.566|139.884|宇都宮餃子,とちおとめ,日光甚五郎煎餅,レモン牛乳,佐野ラーメン,日光湯波,那須チーズ,益子焼,かんぴょう,御用邸チーズケーキ
+群馬県|関東|36.391|139.061|ガトーフェスタ ハラダ ラスク,水沢うどん,峠の釜めし,焼きまんじゅう,こんにゃく,下仁田ねぎ,草津温泉まんじゅう,上州牛,旅がらす,高崎だるま
+埼玉県|関東|35.857|139.649|草加せんべい,十万石まんじゅう,深谷ねぎ,狭山茶,川越いも,五家宝,ゼリーフライ,武蔵野うどん,秩父味噌,彩果の宝石
+千葉県|関東|35.605|140.123|落花生,ぬれ煎餅,びわゼリー,梨,房総海産物,勝浦タンタンメン,銚子醤油,なめろう,ピーナッツバター,鯛せんべい
+東京都|関東|35.690|139.692|東京ばな奈,舟和 芋ようかん,人形焼,雷おこし,東京ひよ子,ごまたまご,江戸切子,佃煮,東京ラーメン,東京クラフトビール
+神奈川県|関東|35.448|139.643|鳩サブレー,崎陽軒シウマイ,ありあけハーバー,月餅,小田原かまぼこ,横浜中華街点心,湘南しらす,鎌倉紅谷クルミッ子,箱根寄木細工,横須賀海軍カレー
+新潟県|中部|37.902|139.023|笹団子,柿の種,へぎそば,魚沼産コシヒカリ,日本酒,越後味噌,栃尾の油揚げ,ぽっぽ焼き,南蛮えび,佐渡バター
+富山県|中部|36.695|137.211|ます寿し,白えび,月世界,ほたるいか,富山ブラックラーメン,昆布締め,かまぼこ,氷見うどん,甘金丹,高岡銅器
+石川県|中部|36.594|136.626|きんつば,加賀棒茶,金沢カレー,柴舟,金箔菓子,のどぐろ,治部煮,九谷焼,輪島塗,加賀麩
+福井県|中部|36.065|136.222|羽二重餅,越前そば,五月ヶ瀬煎餅,焼き鯖寿司,越前がに,水ようかん,ソースカツ丼,へしこ,若狭塗箸,恐竜菓子
+山梨県|中部|35.664|138.568|桔梗信玄餅,ほうとう,甲州ワイン,桃,ぶどう,鳥もつ煮,吉田のうどん,甲州印伝,煮貝,信玄桃
+長野県|中部|36.652|138.181|信州そば,野沢菜漬,栗鹿ノ子,おやき,りんご,七味唐辛子,信州味噌,わさび漬け,軽井沢ビール,五平餅
+岐阜県|中部|35.391|136.722|栗きんとん,朴葉味噌,飛騨牛,鮎菓子,高山ラーメン,鶏ちゃん,五平餅,さるぼぼ,美濃焼,明宝ハム
+静岡県|中部|34.976|138.383|うなぎパイ,静岡茶,安倍川もち,桜えび,浜松餃子,わさび漬け,富士宮やきそば,みかん,黒はんぺん,掛川深蒸し茶
+愛知県|中部|35.180|136.907|ゆかり,ういろう,味噌煮込みうどん,手羽先,ひつまぶし,きしめん,小倉トースト,八丁味噌,守口漬,名古屋コーチン
+三重県|関西|34.730|136.508|赤福餅,伊勢うどん,松阪牛,真珠,なが餅,伊勢茶,てこね寿司,桑名はまぐり,鈴鹿抹茶,伊賀組紐
+滋賀県|関西|35.004|135.868|クラブハリエ バームクーヘン,鮒ずし,近江牛,赤こんにゃく,サラダパン,近江米,信楽焼,丁稚羊羹,湖魚佃煮,彦根梨
+京都府|関西|35.021|135.756|八ツ橋,京ばあむ,宇治茶,抹茶スイーツ,阿闍梨餅,京漬物,ちりめん山椒,湯葉,生麩,清水焼
+大阪府|関西|34.686|135.520|551蓬莱 豚まん,たこ焼き,月化粧,お好み焼き,りくろーおじさんチーズケーキ,岩おこし,串カツ,自由軒カレー,大阪寿司,泉州水なす
+兵庫県|関西|34.691|135.183|神戸風月堂 ゴーフル,炭酸せんべい,神戸牛,明石焼,いかなごのくぎ煮,播州そうめん,姫路おでん,丹波黒豆,神戸プリン,淡路島玉ねぎ
+奈良県|関西|34.685|135.833|柿の葉寿司,奈良漬,みむろ最中,三輪そうめん,吉野葛,大仏プリン,茶粥,わらび餅,柿スイーツ,赤膚焼
+和歌山県|関西|34.226|135.168|梅干し,かげろう,みかん,紀州南高梅,金山寺味噌,めはり寿司,高野豆腐,和歌山ラーメン,湯浅醤油,有田みかんジュース
+鳥取県|中国|35.504|134.238|因幡の白うさぎ,二十世紀梨,とうふちくわ,砂丘らっきょう,松葉がに,白バラ牛乳,牛骨ラーメン,打吹公園だんご,大山バター,鳥取カレー
+島根県|中国|35.472|133.051|若草,出雲そば,宍道湖しじみ,どじょう掬いまんじゅう,あご野焼き,赤てん,源氏巻,仁多米,石見神楽面,隠岐牛
+岡山県|中国|34.662|133.934|きびだんご,白桃,えびめし,マスカット,大手まんぢゅう,デミカツ丼,ままかり,蒜山ジャージー乳製品,備前焼,津山ホルモンうどん
+広島県|中国|34.396|132.459|もみじ饅頭,牡蠣,お好み焼き,レモン,尾道ラーメン,広島菜漬,穴子飯,川通り餅,熊野筆,はっさく大福
+山口県|中国|34.186|131.471|外郎,ふぐ,瓦そば,獺祭,夏みかん菓子,萩焼,岩国寿司,宇部ラーメン,蒲鉾,御堀堂の外郎
+徳島県|四国|34.066|134.559|金長まんじゅう,鳴門金時,徳島ラーメン,すだち,阿波尾鶏,祖谷そば,半田そうめん,阿波和三盆,藍染,フィッシュカツ
+香川県|四国|34.340|134.043|讃岐うどん,灸まん,和三盆,骨付鳥,小豆島オリーブ,しょうゆ豆,オリーブ牛,瓦せんべい,小原紅早生みかん,丸亀うちわ
+愛媛県|四国|33.841|132.766|一六タルト,みかんジュース,じゃこ天,坊っちゃん団子,鯛めし,今治タオル,母恵夢,砥部焼,伯方の塩,紅まどんな
+高知県|四国|33.559|133.531|かつおのたたき,芋けんぴ,ミレービスケット,ゆず加工品,文旦,土佐酒,四万十うなぎ,鍋焼きラーメン,土佐和紙,田舎寿司
+福岡県|九州・沖縄|33.607|130.418|博多通りもん,辛子明太子,博多ラーメン,もつ鍋,めんべい,あまおう,梅ヶ枝餅,筑前煮,博多織,ごぼう天うどん
+佐賀県|九州・沖縄|33.249|130.299|丸ぼうろ,小城羊羹,佐賀牛,嬉野茶,呼子いか,有田焼,シシリアンライス,松露饅頭,竹崎かに,佐賀海苔
+長崎県|九州・沖縄|32.744|129.874|カステラ,角煮まんじゅう,ちゃんぽん,皿うどん,よりより,長崎びわ,五島うどん,からすみ,波佐見焼,ミルクセーキ
+熊本県|九州・沖縄|32.790|130.742|陣太鼓,いきなり団子,馬刺し,熊本ラーメン,辛子蓮根,太平燕,球磨焼酎,阿蘇ジャージー乳製品,デコポン,肥後象がん
+大分県|九州・沖縄|33.238|131.613|ざびえる,とり天,かぼす,やせうま,だんご汁,関あじ,関さば,別府冷麺,椎茸,日田下駄
+宮崎県|九州・沖縄|31.911|131.424|チーズ饅頭,宮崎マンゴー,チキン南蛮,地鶏炭火焼,冷や汁,日向夏,肉巻きおにぎり,飫肥天,宮崎牛,高千穂釜炒り茶
+鹿児島県|九州・沖縄|31.560|130.558|かるかん,さつま揚げ,黒豚,白くま,安納芋,芋焼酎,鶏飯,黒酢,げたんは,薩摩切子
+沖縄県|九州・沖縄|26.212|127.681|ちんすこう,紅いもタルト,泡盛,サーターアンダギー,海ぶどう,沖縄そば,ラフテー,黒糖,シークヮーサー,琉球ガラス
+`;
+
+const text = {
+  ja:{title:"日本 名産・銘菓・定番土産マップ",sub:"47都道府県 × 各10件。インバウンド向け多言語表示に対応。",all:"全国",search:"県名・商品名で検索",allCat:"すべて",count:(n)=>`${n}件表示 / 470件`,overview:"表示中の都道府県",overviewText:(p,n)=>`${p}都道府県、${n}件を表示中。地図の数字マーカーを選ぶと詳細を見られます。`,select:"都道府県を選択",selectText:"マーカーをクリックすると、その土地で定番のお土産・銘菓・グルメを表示します。",prefText:(n)=>`${n}件を表示中。各カードから公式HP検索・地図検索へ移動できます。`,official:"公式HPを探す",map:"地図で探す",none:"条件に合う土産・グルメがありません。",note:"商品名は日本語で表示しています。"},
+  en:{title:"Japan Souvenir & Local Gourmet Map",sub:"10 picks from each of Japan's 47 prefectures, with inbound-friendly multilingual UI.",all:"All Japan",search:"Search prefecture or item",allCat:"All",count:(n)=>`${n} shown / 470 items`,overview:"Visible Prefectures",overviewText:(p,n)=>`${p} prefectures and ${n} items are shown. Select a numbered marker for details.`,select:"Select a Prefecture",selectText:"Click a map marker to see classic souvenirs, sweets, and local foods.",prefText:(n)=>`${n} items shown. Use the links to find official sites or map results.`,official:"Find official site",map:"Search map",none:"No items match the current filters.",note:"Translated item names are shown first; the Japanese original is kept below for local shopping."},
+  zh:{title:"日本名產・銘菓・伴手禮地圖",sub:"47都道府縣各10項，支援訪日旅客多語介面。",all:"全日本",search:"搜尋縣名或商品名",allCat:"全部",count:(n)=>`顯示 ${n} 件 / 共470件`,overview:"目前顯示的都道府縣",overviewText:(p,n)=>`目前顯示 ${p} 個都道府縣、${n} 件。點選地圖上的數字標記可看詳細。`,select:"選擇都道府縣",selectText:"點擊地圖標記，即可查看當地經典伴手禮、甜點與美食。",prefText:(n)=>`顯示 ${n} 件。可從卡片前往官方網站搜尋或地圖搜尋。`,official:"尋找官方網站",map:"地圖搜尋",none:"沒有符合條件的項目。",note:"先顯示翻譯名稱，下方保留日文原名，方便現地購買。"},
+  ko:{title:"일본 명산・명과・대표 선물 지도",sub:"47개 도도부현별 10개 항목, 인바운드용 다국어 UI 지원.",all:"일본 전체",search:"현명 또는 상품명 검색",allCat:"전체",count:(n)=>`${n}개 표시 / 총 470개`,overview:"표시 중인 도도부현",overviewText:(p,n)=>`${p}개 도도부현, ${n}개 항목을 표시 중입니다. 지도 숫자 마커를 선택하면 상세를 볼 수 있습니다.`,select:"도도부현 선택",selectText:"지도 마커를 클릭하면 지역 대표 선물, 과자, 음식을 표시합니다.",prefText:(n)=>`${n}개 항목 표시 중. 카드에서 공식 사이트 검색 또는 지도 검색으로 이동할 수 있습니다.`,official:"공식 사이트 찾기",map:"지도 검색",none:"조건에 맞는 항목이 없습니다.",note:"번역된 상품명을 먼저 표시하고, 현지 구매를 위해 일본어 원명도 함께 남깁니다."}
+};
+const catNames = {
+  ja:["銘菓","名産","グルメ","海産物","飲料","工芸"],
+  en:["Sweets","Specialty","Local Food","Seafood","Drink","Craft"],
+  zh:["銘菓","名產","美食","海產","飲品","工藝"],
+  ko:["명과","명산","음식","해산물","음료","공예"]
+};
+const drinkWords = "茶 ワイン 酒 ビール 焼酎 泡盛 ジュース 牛乳".split(" ");
+const seafoodWords = "牡蠣 しらす まぐろ さば えび かに ふぐ いか しじみ うなぎ 海ぶどう わかめ 帆立 あじ".split(" ");
+const craftWords = "焼 塗 器 筆 切子 ガラス 織 組紐 だるま タオル うちわ 下駄 和紙".split(" ");
+const sweetWords = "餅 饅頭 まんじゅう 菓子 せんべい サブレー ゼリー プリン タルト ケーキ 羊羹 団子 バーム ラスク カステラ ちんすこう".split(" ");
+const itemNote = {
+  ja:(d,i)=>`${d.pref}を代表する${label(i.cat)}。旅先で味わうだけでなく、持ち帰り土産としても人気があります。`,
+  en:(d,i)=>`A signature ${label(i.cat).toLowerCase()} from ${localPref(d.pref)}. It is popular both for tasting during the trip and taking home as a souvenir.`,
+  zh:(d,i)=>`${localPref(d.pref)}代表性的${label(i.cat)}。適合旅途中品嚐，也很適合作為伴手禮。`,
+  ko:(d,i)=>`${localPref(d.pref)}를 대표하는 ${label(i.cat)}입니다. 여행 중 맛보기에도, 선물로 가져가기에도 좋습니다.`
+};
+const regionNames = {
+  en:{"北海道・東北":"Hokkaido & Tohoku","関東":"Kanto","中部":"Chubu","関西":"Kansai","中国":"Chugoku","四国":"Shikoku","九州・沖縄":"Kyushu & Okinawa"},
+  zh:{"北海道・東北":"北海道・東北","関東":"關東","中部":"中部","関西":"關西","中国":"中國","四国":"四國","九州・沖縄":"九州・沖繩"},
+  ko:{"北海道・東北":"홋카이도・도호쿠","関東":"간토","中部":"주부","関西":"간사이","中国":"주고쿠","四国":"시코쿠","九州・沖縄":"규슈・오키나와"}
+};
+const prefName = {
+  en:{"北海道":"Hokkaido","青森県":"Aomori","岩手県":"Iwate","宮城県":"Miyagi","秋田県":"Akita","山形県":"Yamagata","福島県":"Fukushima","茨城県":"Ibaraki","栃木県":"Tochigi","群馬県":"Gunma","埼玉県":"Saitama","千葉県":"Chiba","東京都":"Tokyo","神奈川県":"Kanagawa","新潟県":"Niigata","富山県":"Toyama","石川県":"Ishikawa","福井県":"Fukui","山梨県":"Yamanashi","長野県":"Nagano","岐阜県":"Gifu","静岡県":"Shizuoka","愛知県":"Aichi","三重県":"Mie","滋賀県":"Shiga","京都府":"Kyoto","大阪府":"Osaka","兵庫県":"Hyogo","奈良県":"Nara","和歌山県":"Wakayama","鳥取県":"Tottori","島根県":"Shimane","岡山県":"Okayama","広島県":"Hiroshima","山口県":"Yamaguchi","徳島県":"Tokushima","香川県":"Kagawa","愛媛県":"Ehime","高知県":"Kochi","福岡県":"Fukuoka","佐賀県":"Saga","長崎県":"Nagasaki","熊本県":"Kumamoto","大分県":"Oita","宮崎県":"Miyazaki","鹿児島県":"Kagoshima","沖縄県":"Okinawa"}
+};
+const langEl = document.getElementById("language");
+const search = document.getElementById("search");
+const category = document.getElementById("category");
+const list = document.getElementById("list");
+const panelHead = document.getElementById("panelHead");
+const markerLayer = L.layerGroup();
+let activeRegion = "全国";
+let activePref = null;
+
+function categorize(name){
+  if(craftWords.some(w=>name.includes(w))) return "工芸";
+  if(drinkWords.some(w=>name.includes(w))) return "飲料";
+  if(seafoodWords.some(w=>name.includes(w))) return "海産物";
+  if(sweetWords.some(w=>name.includes(w))) return "銘菓";
+  if(name.includes("ラーメン")||name.includes("うどん")||name.includes("そば")||name.includes("餃子")||name.includes("鍋")||name.includes("牛")||name.includes("豚")||name.includes("鶏")||name.includes("寿司")||name.includes("カレー")) return "グルメ";
+  return "名産";
+}
+const data = catalogText.trim().split("\n").map(line=>{
+  const [pref,region,lat,lng,items] = line.split("|");
+  return {pref,region,lat:+lat,lng:+lng,items:items.split(",").map(name=>({name,cat:categorize(name)}))};
+});
+const regions = ["全国",...Array.from(new Set(data.map(d=>d.region)))];
+const map = L.map("map",{zoomControl:true}).setView([37.8,137.8],5);
+L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:18,attribution:"&copy; OpenStreetMap contributors"}).addTo(map);
+markerLayer.addTo(map);
+
+function lang(){return langEl.value}
+function t(){return text[lang()]}
+function localPref(p){return lang()==="en" ? (prefName.en[p]||p) : p}
+function localRegion(r){return r==="全国" ? t().all : (regionNames[lang()]?.[r] || r)}
+function label(cat){const i=catNames.ja.indexOf(cat); return catNames[lang()][i] || cat}
+const exactItemNames = {
+  en:{
+    "白い恋人":"Shiroi Koibito Cookies","ロイズ 生チョコレート":"ROYCE' Nama Chocolate","六花亭 マルセイバターサンド":"Rokkatei Marusei Butter Sand","じゃがポックル":"Jaga Pokkuru Potato Snack","夕張メロン":"Yubari Melon","北海道チーズ":"Hokkaido Cheese","札幌ラーメン":"Sapporo Ramen","スープカレー":"Soup Curry","青森りんご":"Aomori Apples","かもめの玉子":"Kamome no Tamago Sweets","萩の月":"Hagi no Tsuki Custard Cake","笹かまぼこ":"Sasa Kamaboko Fish Cake","牛たん":"Sendai Beef Tongue","ずんだ餅":"Zunda Mochi","金萬":"Kinman Cakes","稲庭うどん":"Inaniwa Udon","きりたんぽ":"Kiritanpo Rice Sticks","乃し梅":"Noshi Ume Plum Sweet","さくらんぼ":"Yamagata Cherries","米沢牛":"Yonezawa Beef","ままどおる":"Mamador Milk Sweet","喜多方ラーメン":"Kitakata Ramen","水戸納豆":"Mito Natto","干し芋":"Dried Sweet Potato","宇都宮餃子":"Utsunomiya Gyoza","とちおとめ":"Tochiotome Strawberries","ガトーフェスタ ハラダ ラスク":"Gateau Festa Harada Rusk","草加せんべい":"Soka Senbei Rice Crackers","落花生":"Chiba Peanuts","東京ばな奈":"Tokyo Banana","舟和 芋ようかん":"Funawa Sweet Potato Yokan","鳩サブレー":"Hato Sable","崎陽軒シウマイ":"Kiyoken Shumai","笹団子":"Sasa Dango","柿の種":"Kaki no Tane Rice Crackers","ます寿し":"Masu Sushi","白えび":"White Shrimp","きんつば":"Kintsuba Sweet","加賀棒茶":"Kaga Roasted Twig Tea","羽二重餅":"Habutae Mochi","越前そば":"Echizen Soba","桔梗信玄餅":"Kikyo Shingen Mochi","ほうとう":"Hoto Noodles","甲州ワイン":"Koshu Wine","信州そば":"Shinshu Soba","野沢菜漬":"Nozawana Pickles","栗鹿ノ子":"Kuri Kanoko Chestnut Sweet","栗きんとん":"Chestnut Kinton","飛騨牛":"Hida Beef","うなぎパイ":"Unagi Pie","静岡茶":"Shizuoka Tea","ゆかり":"Yukari Shrimp Cracker","ういろう":"Uiro Sweet","味噌煮込みうどん":"Miso Nikomi Udon","赤福餅":"Akafuku Mochi","伊勢うどん":"Ise Udon","松阪牛":"Matsusaka Beef","八ツ橋":"Yatsuhashi Cinnamon Sweet","宇治茶":"Uji Tea","551蓬莱 豚まん":"551 Horai Pork Bun","たこ焼き":"Takoyaki","神戸牛":"Kobe Beef","柿の葉寿司":"Persimmon Leaf Sushi","奈良漬":"Nara-zuke Pickles","梅干し":"Umeboshi Pickled Plums","因幡の白うさぎ":"Inaba White Rabbit Sweet","二十世紀梨":"20th Century Pear","若草":"Wakakusa Sweet","出雲そば":"Izumo Soba","きびだんご":"Kibi Dango","白桃":"White Peach","もみじ饅頭":"Momiji Manju","牡蠣":"Oysters","外郎":"Uiro Sweet","ふぐ":"Pufferfish","讃岐うどん":"Sanuki Udon","一六タルト":"Ichiroku Tart","みかんジュース":"Mikan Orange Juice","かつおのたたき":"Seared Bonito","芋けんぴ":"Sweet Potato Kenpi","博多通りもん":"Hakata Torimon","辛子明太子":"Spicy Cod Roe","カステラ":"Castella Cake","ちゃんぽん":"Nagasaki Champon","陣太鼓":"Jindaiko Sweet","馬刺し":"Horse Sashimi","ざびえる":"Zabieru Sweet","とり天":"Chicken Tempura","チーズ饅頭":"Cheese Manju","宮崎マンゴー":"Miyazaki Mango","かるかん":"Karukan Sweet","さつま揚げ":"Satsuma-age Fish Cake","ちんすこう":"Chinsuko Cookies","紅いもタルト":"Purple Sweet Potato Tart","泡盛":"Awamori"
+  },
+  zh:{"白い恋人":"白色戀人餅乾","ロイズ 生チョコレート":"ROYCE' 生巧克力","六花亭 マルセイバターサンド":"六花亭奶油葡萄夾心餅","じゃがポックル":"北海道薯條零食","夕張メロン":"夕張哈密瓜","北海道チーズ":"北海道起司","札幌ラーメン":"札幌拉麵","スープカレー":"湯咖哩","青森りんご":"青森蘋果","牛たん":"仙台牛舌","ずんだ餅":"毛豆泥麻糬","稲庭うどん":"稻庭烏龍麵","さくらんぼ":"山形櫻桃","米沢牛":"米澤牛","喜多方ラーメン":"喜多方拉麵","水戸納豆":"水戶納豆","宇都宮餃子":"宇都宮煎餃","落花生":"千葉花生","東京ばな奈":"東京香蕉蛋糕","鳩サブレー":"鴿子奶油餅乾","崎陽軒シウマイ":"崎陽軒燒賣","笹団子":"竹葉糰子","柿の種":"柿種米果","ます寿し":"鱒魚壽司","白えび":"白蝦","加賀棒茶":"加賀棒茶","羽二重餅":"羽二重麻糬","桔梗信玄餅":"桔梗信玄餅","甲州ワイン":"甲州葡萄酒","信州そば":"信州蕎麥麵","飛騨牛":"飛驒牛","うなぎパイ":"鰻魚派","静岡茶":"靜岡茶","味噌煮込みうどん":"味噌燉烏龍麵","赤福餅":"赤福餅","松阪牛":"松阪牛","八ツ橋":"八橋肉桂菓子","宇治茶":"宇治茶","551蓬莱 豚まん":"551蓬萊豬肉包","たこ焼き":"章魚燒","神戸牛":"神戶牛","柿の葉寿司":"柿葉壽司","梅干し":"梅干","二十世紀梨":"二十世紀梨","出雲そば":"出雲蕎麥麵","きびだんご":"吉備糰子","白桃":"白桃","もみじ饅頭":"紅葉饅頭","牡蠣":"牡蠣","ふぐ":"河豚","讃岐うどん":"讚岐烏龍麵","みかんジュース":"蜜柑果汁","かつおのたたき":"炙燒鰹魚","芋けんぴ":"地瓜條","辛子明太子":"辣味明太子","カステラ":"長崎蜂蜜蛋糕","ちゃんぽん":"長崎什錦麵","馬刺し":"馬肉刺身","とり天":"雞肉天婦羅","宮崎マンゴー":"宮崎芒果","さつま揚げ":"薩摩炸魚餅","ちんすこう":"金楚糕","紅いもタルト":"紅芋塔","泡盛":"泡盛酒"},
+  ko:{"白い恋人":"시로이 고이비토 쿠키","ロイズ 生チョコレート":"로이스 생초콜릿","六花亭 マルセイバターサンド":"롯카테이 마르세이 버터샌드","じゃがポックル":"자가 포클 감자 스낵","夕張メロン":"유바리 멜론","北海道チーズ":"홋카이도 치즈","札幌ラーメン":"삿포로 라멘","スープカレー":"수프 카레","青森りんご":"아오모리 사과","牛たん":"센다이 우설","ずんだ餅":"즌다 모치","稲庭うどん":"이나니와 우동","さくらんぼ":"야마가타 체리","米沢牛":"요네자와 소고기","喜多方ラーメン":"기타카타 라멘","水戸納豆":"미토 낫토","宇都宮餃子":"우쓰노미야 교자","落花生":"지바 땅콩","東京ばな奈":"도쿄 바나나","鳩サブレー":"하토 사브레","崎陽軒シウマイ":"기요켄 슈마이","笹団子":"사사 당고","柿の種":"가키노타네 쌀과자","ます寿し":"마스 스시","白えび":"흰새우","加賀棒茶":"가가 호지차","羽二重餅":"하부타에 모치","桔梗信玄餅":"기쿄 신겐모치","甲州ワイン":"고슈 와인","信州そば":"신슈 소바","飛騨牛":"히다 소고기","うなぎパイ":"우나기 파이","静岡茶":"시즈오카 차","味噌煮込みうどん":"미소 니코미 우동","赤福餅":"아카후쿠 모치","松阪牛":"마쓰사카 소고기","八ツ橋":"야쓰하시 계피 과자","宇治茶":"우지 차","551蓬莱 豚まん":"551 호라이 돼지고기 만두","たこ焼き":"타코야키","神戸牛":"고베 소고기","柿の葉寿司":"감잎 초밥","梅干し":"우메보시","二十世紀梨":"20세기 배","出雲そば":"이즈모 소바","きびだんご":"기비 당고","白桃":"백도","もみじ饅頭":"모미지 만주","牡蠣":"굴","ふぐ":"복어","讃岐うどん":"사누키 우동","みかんジュース":"귤 주스","かつおのたたき":"가다랑어 타타키","芋けんぴ":"고구마 켄피","辛子明太子":"매운 명란젓","カステラ":"카스텔라","ちゃんぽん":"나가사키 짬뽕","馬刺し":"말고기 사시미","とり天":"닭고기 튀김","宮崎マンゴー":"미야자키 망고","さつま揚げ":"사쓰마아게 어묵","ちんすこう":"친스코 과자","紅いもタルト":"자색고구마 타르트","泡盛":"아와모리"}
+};
+const genericItemName = {
+  en:{銘菓:"Local sweet",名産:"Local specialty",グルメ:"Local dish",海産物:"Seafood specialty",飲料:"Local drink",工芸:"Traditional craft"},
+  zh:{銘菓:"地方甜點",名産:"地方名產",グルメ:"地方美食",海産物:"海產名物",飲料:"在地飲品",工芸:"傳統工藝"},
+  ko:{銘菓:"지역 명과",名産:"지역 명산",グルメ:"지역 음식",海産物:"해산물 명물",飲料:"지역 음료",工芸:"전통 공예"}
+};
+function itemDisplayText(d,i){
+  if(lang()==="ja") return i.name;
+  return exactItemNames[lang()]?.[i.name] || `${localPref(d.pref)} ${genericItemName[lang()][i.cat]}`;
+}
+function itemTitleHtml(d,i){
+  const name = itemDisplayText(d,i);
+  return lang()==="ja" ? name : `${name}<span class="original-name">${i.name}</span>`;
+}
+function officialUrl(d,i){return "https://www.google.com/search?q="+encodeURIComponent(`${d.pref} ${i.name} 公式 HP`)}
+function mapUrl(d,i){return "https://www.google.com/maps/search/"+encodeURIComponent(`${d.pref} ${i.name}`)}
+function queryText(d,i){return `${d.pref} ${localPref(d.pref)} ${d.region} ${i.name} ${itemDisplayText(d,i)} ${i.cat} ${label(i.cat)}`.toLowerCase()}
+function filteredItems(d){
+  const q=search.value.trim().toLowerCase();
+  const cat=category.value;
+  return d.items.filter(i=>(!cat||i.cat===cat)&&(!q||queryText(d,i).includes(q)));
+}
+function matchesPref(d){
+  if(activeRegion!=="全国" && d.region!==activeRegion) return false;
+  const q=search.value.trim().toLowerCase();
+  if(!q) return true;
+  return filteredItems(d).length>0 || `${d.pref} ${localPref(d.pref)} ${d.region}`.toLowerCase().includes(q);
+}
+function setupStaticUI(){
+  const selectedCategory = category.value;
+  document.documentElement.lang = lang();
+  document.getElementById("title").textContent = t().title;
+  document.getElementById("subtitle").textContent = t().sub;
+  search.placeholder = t().search;
+  category.innerHTML = `<option value="">${t().allCat}</option>` + catNames.ja.map(c=>`<option value="${c}">${label(c)}</option>`).join("");
+  category.value = selectedCategory;
+  document.getElementById("regionFilters").innerHTML = regions.map(r=>`<button class="regionBtn ${r===activeRegion?"active":""}" type="button" data-region="${r}">${localRegion(r)}</button>`).join("");
+  document.querySelectorAll(".regionBtn").forEach(btn=>btn.onclick=()=>{activeRegion=btn.dataset.region;activePref=null;render();});
+}
+function render(){
+  setupStaticUI();
+  markerLayer.clearLayers();
+  const shown=data.filter(matchesPref);
+  const shownCount=shown.reduce((sum,d)=>sum+filteredItems(d).length,0);
+  document.getElementById("countText").textContent=t().count(shownCount);
+  shown.forEach(d=>{
+    const count=filteredItems(d).length || d.items.length;
+    const icon=L.divIcon({className:"",html:`<div class="marker">${count}</div>`,iconSize:[36,36],iconAnchor:[18,18]});
+    L.marker([d.lat,d.lng],{icon}).addTo(markerLayer).bindPopup(`<strong>${localPref(d.pref)}</strong><br>${filteredItems(d).slice(0,10).map(i=>itemDisplayText(d,i)).join("<br>")}`).on("click",()=>showPref(d));
+  });
+  if(!activePref || !shown.includes(activePref)) showOverview(shown); else showPref(activePref,false);
+}
+function showOverview(shown){
+  activePref=null;
+  const itemCount=shown.reduce((sum,d)=>sum+filteredItems(d).length,0);
+  panelHead.innerHTML=`<small>${localRegion(activeRegion)}</small><h2>${shown.length? t().overview : t().select}</h2><p>${shown.length?t().overviewText(shown.length,itemCount):t().selectText}</p><div class="note">${t().note}</div>`;
+  list.innerHTML=shown.length?shown.map(d=>`<button class="card" type="button" style="text-align:left;cursor:pointer" onclick="showPrefByName('${d.pref}')"><div class="cardTop"><h3>${localPref(d.pref)}</h3><span class="tag">${localRegion(d.region)}</span></div><p>${filteredItems(d).slice(0,10).map(i=>itemDisplayText(d,i)).join(" / ")}</p></button>`).join(""):`<div class="empty">${t().none}</div>`;
+}
+function showPrefByName(pref){const d=data.find(x=>x.pref===pref); if(d) showPref(d)}
+function showPref(d,pan=true){
+  activePref=d;
+  if(pan) map.setView([d.lat,d.lng],7,{animate:true});
+  const items=filteredItems(d);
+  panelHead.innerHTML=`<small>${localRegion(d.region)}</small><h2>${localPref(d.pref)}</h2><p>${t().prefText(items.length)}</p><div class="note">${t().note}</div>`;
+  list.innerHTML=items.length?items.map(i=>`<article class="card"><div class="cardTop"><div><h3>${itemTitleHtml(d,i)}</h3><div class="meta">${localPref(d.pref)}</div></div><span class="tag">${label(i.cat)}</span></div><p>${itemNote[lang()](d,i)}</p><div class="linkRow"><a class="linkBtn" href="${officialUrl(d,i)}" target="_blank" rel="noopener noreferrer">${t().official}</a><a class="linkBtn" href="${mapUrl(d,i)}" target="_blank" rel="noopener noreferrer">${t().map}</a></div></article>`).join(""):`<div class="empty">${t().none}</div>`;
+}
+search.addEventListener("input",render);
+category.addEventListener("change",render);
+langEl.addEventListener("change",render);
+render();
+</script>
+</body>
+</html>
