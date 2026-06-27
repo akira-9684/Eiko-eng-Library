@@ -1,0 +1,504 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>日本の交通ルール ○×クイズ</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #1d2430;
+      --muted: #647083;
+      --line: #d9e0ea;
+      --panel: #ffffff;
+      --soft: #f4f7fb;
+      --road: #303842;
+      --accent: #0f766e;
+      --warn: #b45309;
+      font-family: "Yu Gothic UI", "Meiryo", system-ui, sans-serif;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: #eef3f8; color: var(--ink); }
+    main { width: min(1120px, calc(100% - 28px)); margin: 0 auto; padding: 22px 0 36px; }
+    header {
+      display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 16px; align-items: end;
+      padding: 0 0 16px; border-bottom: 1px solid var(--line);
+    }
+    h1 { margin: 0 0 6px; font-size: clamp(24px, 4vw, 38px); letter-spacing: 0; line-height: 1.2; }
+    p { margin: 0; line-height: 1.7; }
+    .lead { color: var(--muted); max-width: 780px; }
+    .toolbar { display: flex; flex-wrap: wrap; gap: 10px; justify-content: flex-end; align-items: center; }
+    select, button {
+      border: 1px solid var(--line); background: var(--panel); color: var(--ink); min-height: 40px;
+      border-radius: 6px; padding: 8px 12px; font: inherit;
+    }
+    button { cursor: pointer; font-weight: 700; }
+    button.primary { border-color: var(--accent); background: var(--accent); color: #fff; }
+    button:disabled { opacity: .45; cursor: not-allowed; }
+    .layout { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 16px; margin-top: 18px; align-items: start; }
+    .quiz, .side { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+    .quiz-head {
+      display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; padding: 16px;
+      background: #f8fafc; border-bottom: 1px solid var(--line); align-items: center;
+    }
+    .quiz-title { margin: 0; font-size: 20px; line-height: 1.35; }
+    .progress { color: var(--muted); font-weight: 700; white-space: nowrap; }
+    .question-list { display: grid; gap: 0; }
+    .question { display: grid; grid-template-columns: 48px minmax(0, 1fr) auto; gap: 12px; align-items: start; padding: 16px; border-bottom: 1px solid var(--line); }
+    .question:last-child { border-bottom: 0; }
+    .num { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 50%; background: var(--soft); font-weight: 800; color: var(--muted); }
+    .qtext { font-size: 17px; line-height: 1.65; }
+    .original { display: block; margin-top: 8px; color: var(--muted); font-size: 13px; line-height: 1.55; }
+    .pending { display: inline-block; margin-top: 8px; color: var(--warn); font-size: 13px; font-weight: 700; }
+    .answer-box { display: grid; grid-template-columns: 54px 54px; gap: 8px; min-width: 116px; }
+    .answer-box input { position: absolute; opacity: 0; pointer-events: none; }
+    .answer-box label { display: grid; place-items: center; height: 42px; border: 1px solid var(--line); border-radius: 6px; font-size: 22px; font-weight: 900; background: #fff; cursor: pointer; }
+    .answer-box input:checked + label { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(15, 118, 110, .15); color: var(--accent); }
+    .question.correct { background: #effaf5; }
+    .question.wrong { background: #fff3f0; }
+    .explain { display: none; grid-column: 2 / 4; margin-top: -4px; color: var(--muted); line-height: 1.7; }
+    .question.correct .explain, .question.wrong .explain { display: block; }
+    .side { position: sticky; top: 12px; padding: 16px; }
+    .score { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }
+    .metric { background: var(--soft); border-radius: 8px; padding: 12px; }
+    .metric b { display: block; font-size: 28px; line-height: 1; margin-bottom: 4px; }
+    .metric span { color: var(--muted); font-size: 13px; }
+    .road-wrap { margin: 14px 0; padding: 16px 14px 18px; background: #dce8ee; border-radius: 8px; }
+    .road {
+      position: relative; height: 88px; border-radius: 6px;
+      background: linear-gradient(90deg, transparent 0 8%, rgba(255,255,255,.9) 8% 12%, transparent 12% 20%) 0 42px / 120px 4px repeat-x, var(--road);
+      overflow: hidden; border: 4px solid #202832;
+    }
+    .finish { position: absolute; right: 8px; top: 0; width: 18px; height: 100%; background: linear-gradient(45deg, #fff 25%, #111 25% 50%, #fff 50% 75%, #111 75%) 0 0 / 18px 18px; opacity: .9; }
+    .car { position: absolute; left: 8px; top: 30px; width: 54px; height: 28px; border-radius: 10px 15px 8px 8px; background: #dc2626; box-shadow: inset 12px -4px 0 rgba(0,0,0,.12); transform: translateX(0); transition: transform .35s cubic-bezier(.17,.84,.35,1); }
+    .car::before { content: ""; position: absolute; left: 14px; top: -10px; width: 26px; height: 14px; border-radius: 10px 10px 0 0; background: #f8fafc; border: 3px solid #dc2626; border-bottom: 0; }
+    .car::after { content: ""; position: absolute; left: 7px; bottom: -6px; width: 42px; height: 12px; background: radial-gradient(circle at 6px 6px, #111 0 6px, transparent 6px), radial-gradient(circle at 36px 6px, #111 0 6px, transparent 6px); }
+    .result { min-height: 96px; padding: 14px; border-radius: 8px; background: #fff; border: 1px solid var(--line); }
+    .result h2 { margin: 0 0 8px; font-size: 20px; line-height: 1.3; }
+    .reward { margin: 12px 0 4px; min-height: 74px; display: grid; place-items: center; border-radius: 8px; background: #f8fafc; overflow: hidden; position: relative; }
+    .reward strong { position: relative; z-index: 2; font-size: 22px; line-height: 1.35; text-align: center; }
+    .reward-perfect { background: #fff7ed; color: #9a3412; }
+    .reward-perfect::before { content: "★ ★ ★ ★ ★"; position: absolute; inset: 10px 0 auto; text-align: center; color: #f59e0b; font-size: 28px; animation: sparkle 1s ease-in-out infinite alternate; }
+    .reward-almost { background: #ecfeff; color: #155e75; }
+    .reward-almost::before { content: ""; position: absolute; width: 42px; height: 42px; border-radius: 50%; background: #22d3ee; left: 16px; top: 16px; animation: roll 1.2s ease-in-out infinite alternate; opacity: .8; }
+    .reward-try { background: #eef2ff; color: #3730a3; }
+    .reward-try strong { animation: bounceText .9s ease-in-out infinite alternate; }
+    @keyframes sparkle { from { transform: translateY(10px) scale(.9); opacity: .65; } to { transform: translateY(-2px) scale(1.08); opacity: 1; } }
+    @keyframes roll { from { transform: translateX(0) rotate(0deg); } to { transform: translateX(220px) rotate(360deg); } }
+    @keyframes bounceText { from { transform: translateY(5px); } to { transform: translateY(-5px); } }
+    .notice { margin-top: 14px; color: var(--muted); font-size: 13px; line-height: 1.7; }
+    .actions { display: grid; gap: 10px; margin-top: 14px; }
+    @media (max-width: 860px) {
+      header, .layout { grid-template-columns: 1fr; }
+      .toolbar { justify-content: stretch; }
+      select, button { width: 100%; }
+      .side { position: static; }
+      .question { grid-template-columns: 40px minmax(0, 1fr); }
+      .answer-box { grid-column: 2; width: 100%; grid-template-columns: 1fr 1fr; }
+      .explain { grid-column: 2; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <div>
+        <h1 id="appTitle"></h1>
+        <p class="lead" id="appLead"></p>
+      </div>
+      <div class="toolbar">
+        <select id="languageSelect" aria-label="Language">
+          <option value="ja">日本語</option>
+          <option value="en">English</option>
+          <option value="ko">한국어</option>
+          <option value="zhTW">繁體中文</option>
+          <option value="zhCN">简体中文</option>
+          <option value="th">ไทย</option>
+          <option value="vi">Tiếng Việt</option>
+        </select>
+        <select id="patternSelect" aria-label="出題パターン"></select>
+        <button id="shuffleButton" type="button"></button>
+      </div>
+    </header>
+    <div class="layout">
+      <section class="quiz" aria-live="polite">
+        <div class="quiz-head">
+          <h2 class="quiz-title" id="quizTitle"></h2>
+          <div class="progress" id="progressText">0 / 10</div>
+        </div>
+        <div class="question-list" id="questionList"></div>
+      </section>
+      <aside class="side">
+        <div class="score">
+          <div class="metric"><b id="answeredCount">0</b><span id="answeredLabel"></span></div>
+          <div class="metric"><b id="scoreCount">-</b><span id="scoreLabel"></span></div>
+        </div>
+        <div class="road-wrap">
+          <div class="road" id="road"><div class="finish"></div><div class="car" id="car" aria-hidden="true"></div></div>
+        </div>
+        <div class="result" id="resultBox"></div>
+        <div class="actions">
+          <button class="primary" id="gradeButton" type="button" disabled></button>
+          <button id="resetButton" type="button"></button>
+        </div>
+        <p class="notice" id="noticeText"></p>
+      </aside>
+    </div>
+  </main>
+  <script>
+    const patterns = [{"id":1,"title":"基本ルール","questions":[{"no":1,"question":"日本では、自動車は原則として道路の左側を通行する。","answer":true,"explanation":"日本は左側通行です。","i18n":{"en":{"question":"In Japan, vehicles generally drive on the left side of the road.","explanation":"Japan uses left-hand traffic."},"ko":{"question":"일본에서는 자동차가 원칙적으로 도로의 왼쪽으로 통행합니다.","explanation":"일본은 좌측통행입니다."},"zhTW":{"question":"在日本，汽車原則上靠道路左側通行。","explanation":"日本採用左側通行。"},"zhCN":{"question":"在日本，汽车原则上靠道路左侧通行。","explanation":"日本实行左侧通行。"},"th":{"question":"ในประเทศญี่ปุ่น โดยหลักแล้วรถยนต์ต้องวิ่งทางด้านซ้ายของถนน","explanation":"ญี่ปุ่นใช้ระบบจราจรชิดซ้าย"},"vi":{"question":"Ở Nhật Bản, ô tô về nguyên tắc đi bên trái đường.","explanation":"Nhật Bản áp dụng giao thông bên trái."}}},{"no":2,"question":"赤信号でも、歩行者や車がいなければ左折してよい。","answer":false,"explanation":"日本では原則として赤信号で左折できません。","i18n":{"en":{"question":"At a red light, you may turn left if there are no pedestrians or vehicles.","explanation":"In Japan, vehicles generally may not turn left on a red light."},"ko":{"question":"빨간불이어도 보행자나 차량이 없으면 좌회전해도 됩니다.","explanation":"일본에서는 원칙적으로 빨간불에 좌회전할 수 없습니다."},"zhTW":{"question":"紅燈時，如果沒有行人或車輛，也可以左轉。","explanation":"在日本，原則上紅燈不能左轉。"},"zhCN":{"question":"红灯时，如果没有行人或车辆，也可以左转。","explanation":"在日本，原则上红灯不能左转。"},"th":{"question":"เมื่อไฟแดง หากไม่มีคนเดินเท้าหรือรถคันอื่น สามารถเลี้ยวซ้ายได้","explanation":"ในญี่ปุ่น โดยหลักแล้วห้ามเลี้ยวซ้ายเมื่อไฟแดง"},"vi":{"question":"Khi đèn đỏ, nếu không có người đi bộ hoặc xe khác thì được rẽ trái.","explanation":"Ở Nhật Bản, về nguyên tắc không được rẽ trái khi đèn đỏ."}}},{"no":3,"question":"一時停止標識がある場所では、車が来ていなければ徐行で通過してよい。","answer":false,"explanation":"停止線の直前で完全に停止します。","i18n":{"en":{"question":"At a stop sign, you may pass slowly without stopping if no vehicle is coming.","explanation":"You must come to a complete stop before the stop line."},"ko":{"question":"일시정지 표지가 있는 곳에서는 차량이 오지 않으면 서행으로 통과해도 됩니다.","explanation":"정지선 바로 앞에서 완전히 정지해야 합니다."},"zhTW":{"question":"有停車標誌的地方，如果沒有來車，可以慢行通過。","explanation":"必須在停止線前完全停車。"},"zhCN":{"question":"有停车标志时，如果没有来车，可以慢行通过。","explanation":"必须在停止线前完全停车。"},"th":{"question":"เมื่อมีป้ายหยุด หากไม่มีรถมา สามารถขับผ่านช้า ๆ โดยไม่หยุดได้","explanation":"ต้องหยุดรถให้สนิทก่อนเส้นหยุด"},"vi":{"question":"Ở nơi có biển dừng, nếu không có xe tới thì có thể đi chậm qua mà không cần dừng.","explanation":"Phải dừng hẳn trước vạch dừng."}}},{"no":4,"question":"横断歩道を渡ろうとする歩行者がいるときは、車は一時停止する。","answer":true,"explanation":"横断歩道では歩行者優先です。","i18n":{"en":{"question":"When a pedestrian is about to cross at a crosswalk, the vehicle must stop.","explanation":"Pedestrians have priority at crosswalks."},"ko":{"question":"횡단보도를 건너려는 보행자가 있을 때 차량은 일시정지해야 합니다.","explanation":"횡단보도에서는 보행자가 우선입니다."},"zhTW":{"question":"有行人準備通過行人穿越道時，車輛必須停車。","explanation":"在行人穿越道，行人優先。"},"zhCN":{"question":"有行人准备通过人行横道时，车辆必须停车。","explanation":"在人行横道处，行人优先。"},"th":{"question":"เมื่อมีคนเดินเท้ากำลังจะข้ามทางม้าลาย รถต้องหยุด","explanation":"ทางม้าลายให้สิทธิคนเดินเท้าก่อน"},"vi":{"question":"Khi có người đi bộ chuẩn bị qua vạch sang đường, xe phải dừng lại.","explanation":"Tại vạch sang đường, người đi bộ được ưu tiên."}}},{"no":5,"question":"踏切では、警報機が鳴っていなくても原則として一時停止して安全確認する。","answer":true,"explanation":"停止し、左右と音を確認します。","i18n":{"en":{"question":"At a railroad crossing, you generally stop and check safety even if the alarm is not sounding.","explanation":"Stop and check both directions and listen for trains."},"ko":{"question":"철도 건널목에서는 경보기가 울리지 않아도 원칙적으로 일시정지하고 안전을 확인합니다.","explanation":"정지한 뒤 좌우와 소리를 확인합니다."},"zhTW":{"question":"在平交道，即使警報器沒有響，原則上也要停車確認安全。","explanation":"停車後確認左右方向，並注意聲音。"},"zhCN":{"question":"铁路道口即使警报器没有响，原则上也要停车确认安全。","explanation":"停车后确认左右方向并注意声音。"},"th":{"question":"ที่ทางข้ามรถไฟ แม้สัญญาณเตือนจะไม่ดัง โดยหลักแล้วต้องหยุดและตรวจสอบความปลอดภัย","explanation":"ให้หยุด แล้วตรวจสอบซ้ายขวาและฟังเสียงรถไฟ"},"vi":{"question":"Tại đường ngang đường sắt, dù chuông cảnh báo không kêu, về nguyên tắc vẫn phải dừng và kiểm tra an toàn.","explanation":"Hãy dừng lại, kiểm tra hai bên và lắng nghe âm thanh tàu."}}},{"no":6,"question":"後部座席の同乗者は、シートベルトをしなくてもよい。","answer":false,"explanation":"後席もシートベルト着用が必要です。","i18n":{"en":{"question":"Rear-seat passengers do not need to wear seat belts.","explanation":"Seat belts are required in rear seats as well."},"ko":{"question":"뒷좌석 동승자는 안전벨트를 하지 않아도 됩니다.","explanation":"뒷좌석도 안전벨트 착용이 필요합니다."},"zhTW":{"question":"後座乘客不繫安全帶也可以。","explanation":"後座也必須繫安全帶。"},"zhCN":{"question":"后排乘客不系安全带也可以。","explanation":"后排座位也需要系安全带。"},"th":{"question":"ผู้โดยสารเบาะหลังไม่จำเป็นต้องคาดเข็มขัดนิรภัย","explanation":"เบาะหลังก็ต้องคาดเข็มขัดนิรภัยเช่นกัน"},"vi":{"question":"Hành khách ghế sau không cần thắt dây an toàn.","explanation":"Ghế sau cũng cần thắt dây an toàn."}}},{"no":7,"question":"運転中にスマートフォンを手に持って通話してはいけない。","answer":true,"explanation":"ながら運転は重大事故につながります。","i18n":{"en":{"question":"You must not talk on a smartphone held in your hand while driving.","explanation":"Distracted driving can lead to serious crashes."},"ko":{"question":"운전 중 스마트폰을 손에 들고 통화해서는 안 됩니다.","explanation":"주의 산만 운전은 중대한 사고로 이어질 수 있습니다."},"zhTW":{"question":"駕駛中不得手持智慧型手機通話。","explanation":"分心駕駛可能導致重大事故。"},"zhCN":{"question":"驾驶中不得手持智能手机通话。","explanation":"分心驾驶可能导致重大事故。"},"th":{"question":"ห้ามถือสมาร์ตโฟนคุยโทรศัพท์ขณะขับรถ","explanation":"การขับรถโดยเสียสมาธิอาจนำไปสู่อุบัติเหตุร้ายแรง"},"vi":{"question":"Không được cầm điện thoại thông minh để nói chuyện khi đang lái xe.","explanation":"Lái xe mất tập trung có thể dẫn đến tai nạn nghiêm trọng."}}},{"no":8,"question":"追越しが終わったあとも、高速道路の追越車線を走り続けてよい。","answer":false,"explanation":"追越し後は走行車線に戻ります。","i18n":{"en":{"question":"After overtaking, you may continue driving in the passing lane on an expressway.","explanation":"After overtaking, return to the driving lane."},"ko":{"question":"추월이 끝난 뒤에도 고속도로 추월차로를 계속 달려도 됩니다.","explanation":"추월 후에는 주행차로로 돌아가야 합니다."},"zhTW":{"question":"超車結束後，也可以繼續行駛在高速公路的超車道。","explanation":"超車後應回到行駛車道。"},"zhCN":{"question":"超车结束后，也可以继续在高速公路超车道行驶。","explanation":"超车后应回到行驶车道。"},"th":{"question":"หลังจากแซงเสร็จแล้ว สามารถขับต่อในช่องแซงบนทางด่วนได้","explanation":"หลังแซงเสร็จ ให้กลับเข้าสู่ช่องวิ่งปกติ"},"vi":{"question":"Sau khi vượt xe, có thể tiếp tục chạy ở làn vượt trên đường cao tốc.","explanation":"Sau khi vượt, hãy trở lại làn chạy."}}},{"no":9,"question":"酒を飲んだ人に車を運転させることも違反になる。","answer":true,"explanation":"酒気帯び運転の助長も厳しく問われます。","i18n":{"en":{"question":"It is also a violation to let a person who has consumed alcohol drive.","explanation":"Helping or allowing drunk driving is treated strictly."},"ko":{"question":"술을 마신 사람에게 차를 운전하게 하는 것도 위반이 됩니다.","explanation":"음주운전을 돕거나 허용하는 행위도 엄격히 다루어집니다."},"zhTW":{"question":"讓喝過酒的人開車也屬於違規。","explanation":"協助或縱容酒後駕駛會被嚴格追究。"},"zhCN":{"question":"让喝过酒的人开车也可能违法。","explanation":"帮助或纵容酒后驾驶会被严格追究。"},"th":{"question":"การให้คนที่ดื่มแอลกอฮอล์ขับรถก็เป็นการฝ่าฝืน","explanation":"การช่วยหรือยินยอมให้เมาแล้วขับจะถูกดำเนินการอย่างเข้มงวด"},"vi":{"question":"Để người đã uống rượu lái xe cũng là vi phạm.","explanation":"Việc giúp hoặc cho phép lái xe sau khi uống rượu bị xử lý nghiêm."}}},{"no":10,"question":"運転者は、同乗者がドアを開けるときの安全にも注意する必要がある。","answer":true,"explanation":"自転車や歩行者との接触事故を防ぎます。","i18n":{"en":{"question":"Drivers must also pay attention to safety when passengers open doors.","explanation":"This helps prevent contact with bicycles and pedestrians."},"ko":{"question":"운전자는 동승자가 문을 열 때의 안전에도 주의해야 합니다.","explanation":"자전거와 보행자와의 접촉 사고를 예방합니다."},"zhTW":{"question":"乘客開車門時，駕駛人也需要注意安全。","explanation":"這有助於防止與自行車和行人發生接觸事故。"},"zhCN":{"question":"乘客开车门时，驾驶人也需要注意安全。","explanation":"这样可以防止与自行车和行人发生接触事故。"},"th":{"question":"ผู้ขับขี่ต้องใส่ใจความปลอดภัยเมื่อผู้โดยสารเปิดประตูรถด้วย","explanation":"ช่วยป้องกันการชนกับจักรยานและคนเดินเท้า"},"vi":{"question":"Người lái cũng cần chú ý an toàn khi hành khách mở cửa xe.","explanation":"Điều này giúp phòng tránh va chạm với xe đạp và người đi bộ."}}}],"titleI18n":{"ja":"基本ルール","en":"Basic Rules","ko":"기본 규칙","zhTW":"基本規則","zhCN":"基本规则","th":"กฎพื้นฐาน","vi":"Quy tắc cơ bản"}},{"id":2,"title":"外国人が間違えやすいルール","questions":[{"no":1,"question":"日本の停止標識は、赤い逆三角形である。","answer":true,"explanation":"国によって形が違うため注意します。"},{"no":2,"question":"青信号なら、横断中の歩行者がいても車は進んでよい。","answer":false,"explanation":"青でも安全確認と歩行者保護が必要です。"},{"no":3,"question":"日本では、道路標識や標示が優先される場合がある。","answer":true,"explanation":"標識、標示、信号、警察官の指示に従います。"},{"no":4,"question":"右側通行の国から来た人は、右左折後に反対車線へ入りやすい。","answer":true,"explanation":"交差点通過後の車線位置に注意します。"},{"no":5,"question":"国際運転免許証があれば、どの国の免許でも日本で必ず運転できる。","answer":false,"explanation":"条約、免許の種類、期間など条件があります。"},{"no":6,"question":"レンタカーを借りる前に、標識と交通ルールを確認するのが望ましい。","answer":true,"explanation":"事故防止に有効です。"},{"no":7,"question":"赤信号と青矢印が同時に出ているときは、青矢印の方向だけ進める。","answer":true,"explanation":"青矢印の方向に限って進行できます。"},{"no":8,"question":"黄色の矢印信号は、自動車もその方向へ進める合図である。","answer":false,"explanation":"黄色矢印は路面電車用です。"},{"no":9,"question":"「止まれ」の標識は、見通しが良ければ停止しなくてもよい。","answer":false,"explanation":"見通しに関係なく完全停止します。"},{"no":10,"question":"日本ではクラクションは危険防止など必要な場合に限って使う。","answer":true,"explanation":"不必要な使用は避けます。"}],"titleI18n":{"ja":"外国人が間違えやすいルール","en":"Rules Foreign Drivers Often Miss","ko":"외국인 운전자가 자주 헷갈리는 규칙","zhTW":"外國駕駛人容易誤解的規則","zhCN":"外国驾驶人容易误解的规则","th":"กฎที่ผู้ขับขี่ต่างชาติมักเข้าใจผิด","vi":"Quy tắc người lái nước ngoài dễ nhầm"}},{"id":3,"title":"交差点","questions":[{"no":1,"question":"右折時、対向直進車の進行を妨げてはいけない。","answer":true,"explanation":"右折車は対向直進車に注意します。"},{"no":2,"question":"右折待ちで交差点内に入ったら、信号が赤になっても安全なら速やかに出る。","answer":true,"explanation":"交差点内に取り残されないようにします。"},{"no":3,"question":"左折時は、左後方の自転車や歩行者を確認する。","answer":true,"explanation":"巻き込み事故防止が重要です。"},{"no":4,"question":"交差点の直前で急に進路変更して右左折してもよい。","answer":false,"explanation":"早めに合図し、安全に進路変更します。"},{"no":5,"question":"信号のない交差点では、優先道路や一時停止の有無を確認する。","answer":true,"explanation":"優先関係を誤ると事故につながります。"},{"no":6,"question":"交差点内で渋滞して停止するおそれがあるときも、青信号なら進入してよい。","answer":false,"explanation":"交差点をふさがないよう進入を控えます。"},{"no":7,"question":"右左折時の合図は、直前ではなく余裕をもって出す。","answer":true,"explanation":"周囲へ意思を早めに伝えます。"},{"no":8,"question":"横断歩道の直前で止まっている車の横を通るときは、一時停止が必要な場合がある。","answer":true,"explanation":"歩行者が隠れている可能性があります。"},{"no":9,"question":"交差点では、対向車だけ見ていれば十分である。","answer":false,"explanation":"歩行者、自転車、二輪車も確認します。"},{"no":10,"question":"右折時、大型車の陰から二輪車が出てくることがある。","answer":true,"explanation":"死角を予測します。"}],"titleI18n":{"ja":"交差点","en":"Intersections","ko":"교차로","zhTW":"交叉路口","zhCN":"交叉路口","th":"ทางแยก","vi":"Giao lộ"}},{"id":4,"title":"横断歩道と歩行者保護","questions":[{"no":1,"question":"横断歩道に近づいたら、歩行者の有無を確認できる速度で進む。","answer":true,"explanation":"すぐ停止できる準備が必要です。"},{"no":2,"question":"横断歩道を渡ろうとする人がいても、急いでいれば先に通過してよい。","answer":false,"explanation":"歩行者優先です。"},{"no":3,"question":"横断歩道のない場所でも、高齢者や子どもの動きに注意する。","answer":true,"explanation":"飛び出しや転倒を予測します。"},{"no":4,"question":"歩道を横切って駐車場へ入るときは、歩行者の通行を妨げない。","answer":true,"explanation":"歩道上の安全確認が必要です。"},{"no":5,"question":"水たまりの水を歩行者にはねても、交通違反にはならない。","answer":false,"explanation":"泥はね運転になる場合があります。"},{"no":6,"question":"学校や公園の近くでは、子どもの飛び出しを予測する。","answer":true,"explanation":"速度を落として備えます。"},{"no":7,"question":"夜間は、黒っぽい服の歩行者が見えにくい。","answer":true,"explanation":"早めの発見が難しくなります。"},{"no":8,"question":"横断歩道上で自転車に乗ったまま渡る人には注意しなくてよい。","answer":false,"explanation":"接触防止のため注意が必要です。"},{"no":9,"question":"バス停付近では、バスの前後から歩行者が出ることがある。","answer":true,"explanation":"死角からの横断を予測します。"},{"no":10,"question":"歩行者が横断をためらっているときは、車が先に行く意思表示をする方が安全である。","answer":false,"explanation":"状況に応じて停止し、歩行者を優先します。"}],"titleI18n":{"ja":"横断歩道と歩行者保護","en":"Crosswalks and Pedestrian Protection","ko":"횡단보도와 보행자 보호","zhTW":"行人穿越道與行人保護","zhCN":"人行横道与行人保护","th":"ทางม้าลายและการคุ้มครองคนเดินเท้า","vi":"Vạch sang đường và bảo vệ người đi bộ"}},{"id":5,"title":"信号と標識","questions":[{"no":1,"question":"黄色信号は、原則として停止位置を越えて進んではいけない。","answer":true,"explanation":"安全に停止できない場合を除き停止します。"},{"no":2,"question":"赤点滅信号では、徐行すれば停止しなくてもよい。","answer":false,"explanation":"一時停止して安全確認します。"},{"no":3,"question":"黄点滅信号では、他の交通に注意して進む。","answer":true,"explanation":"徐行や安全確認が必要です。"},{"no":4,"question":"「進入禁止」の標識がある道路へは、目的地が近ければ入ってよい。","answer":false,"explanation":"標識に従います。"},{"no":5,"question":"補助標識には、時間帯や車種の条件が示されることがある。","answer":true,"explanation":"本標識と合わせて確認します。"},{"no":6,"question":"「一方通行」は、自動車だけでなく自転車にも関係する場合がある。","answer":true,"explanation":"補助標識の有無を確認します。"},{"no":7,"question":"標識が見えなかった場合は、違反にならない。","answer":false,"explanation":"見落としを防ぐ注意義務があります。"},{"no":8,"question":"警察官の手信号は、信号機より優先される場合がある。","answer":true,"explanation":"現場の指示に従います。"},{"no":9,"question":"「指定方向外進行禁止」は、矢印以外の方向へ進めない。","answer":true,"explanation":"交差点でよく出る規制です。"},{"no":10,"question":"規制標識は、丸形や逆三角形など形にも意味がある。","answer":true,"explanation":"形と色で規制内容を判断します。"}],"titleI18n":{"ja":"信号と標識","en":"Signals and Road Signs","ko":"신호와 도로 표지","zhTW":"號誌與道路標誌","zhCN":"信号灯和道路标志","th":"สัญญาณไฟและป้ายจราจร","vi":"Đèn tín hiệu và biển báo"}},{"id":6,"title":"速度と車間距離","questions":[{"no":1,"question":"制限速度は、標識がある場合はその標識に従う。","answer":true,"explanation":"規制速度が優先されます。"},{"no":2,"question":"天候が悪くても、制限速度以内なら常に安全である。","answer":false,"explanation":"状況に応じて速度を落とします。"},{"no":3,"question":"雨の日は停止距離が長くなる。","answer":true,"explanation":"乾燥路面より滑りやすくなります。"},{"no":4,"question":"前車との距離は、速度が高いほど広く取る。","answer":true,"explanation":"反応時間と制動距離が伸びます。"},{"no":5,"question":"住宅街では、歩行者や自転車を優先して速度を控える。","answer":true,"explanation":"生活道路では特に慎重に走ります。"},{"no":6,"question":"2026年9月1日以降、中央線や車両通行帯がない一般道路の法定最高速度は原則30km/hとなる予定である。","answer":true,"explanation":"施行日を明記して扱います。"},{"no":7,"question":"制限速度60km/hの道路なら、住宅街でも必ず60km/hで走るべきである。","answer":false,"explanation":"状況に応じた安全速度が必要です。"},{"no":8,"question":"下り坂では速度が出やすいので、早めに減速する。","answer":true,"explanation":"エンジンブレーキも活用します。"},{"no":9,"question":"トンネル出口では横風や明るさの変化に注意する。","answer":true,"explanation":"ハンドル操作や視界に影響します。"},{"no":10,"question":"車間距離を詰めると、前車に注意を促せて安全である。","answer":false,"explanation":"あおり運転や追突の危険があります。"}],"titleI18n":{"ja":"速度と車間距離","en":"Speed and Following Distance","ko":"속도와 안전거리","zhTW":"速度與車距","zhCN":"速度和车距","th":"ความเร็วและระยะห่าง","vi":"Tốc độ và khoảng cách an toàn"}},{"id":7,"title":"高速道路","questions":[{"no":1,"question":"高速道路では、追越しが終わったら走行車線へ戻る。","answer":true,"explanation":"追越車線の走行継続は違反になり得ます。"},{"no":2,"question":"合流では、本線車の流れに合わせて十分に加速する。","answer":true,"explanation":"速度差を小さくします。"},{"no":3,"question":"高速道路で故障したら、車内に残るのが最も安全である。","answer":false,"explanation":"後続車に注意し、安全な場所へ避難します。"},{"no":4,"question":"停止表示器材を積んでおくことは、高速道路利用時に重要である。","answer":true,"explanation":"故障・事故時に後続車へ知らせます。"},{"no":5,"question":"逆走に気づいたら、ハザードを出して路肩に止まるなど安全確保を優先する。","answer":true,"explanation":"正面衝突を避ける行動が必要です。"},{"no":6,"question":"SA/PAから本線へ戻るときも、加速車線で安全確認する。","answer":true,"explanation":"本線車との速度差に注意します。"},{"no":7,"question":"ETCレーンでは、バーが開く前から速度を上げてよい。","answer":false,"explanation":"徐行して安全に通過します。"},{"no":8,"question":"渋滞最後尾では、ハザードランプで後続車へ知らせることがある。","answer":true,"explanation":"追突防止に役立ちます。"},{"no":9,"question":"高速道路で眠気を感じたら、次の休憩施設まで我慢して走り続ける。","answer":false,"explanation":"早めに休憩し、無理をしません。"},{"no":10,"question":"トンネル内では車間距離を広く取り、ライトを点灯する。","answer":true,"explanation":"視認性と追突防止のためです。"}],"titleI18n":{"ja":"高速道路","en":"Expressways","ko":"고속도로","zhTW":"高速公路","zhCN":"高速公路","th":"ทางด่วน","vi":"Đường cao tốc"}},{"id":8,"title":"踏切","questions":[{"no":1,"question":"踏切の直前では、原則として一時停止する。","answer":true,"explanation":"安全確認が必要です。"},{"no":2,"question":"警報機が鳴り始めたら、急いで踏切内へ入ってよい。","answer":false,"explanation":"踏切内へ入ってはいけません。"},{"no":3,"question":"前方が渋滞して踏切内で止まりそうなときは、踏切に入らない。","answer":true,"explanation":"閉じ込めを防ぎます。"},{"no":4,"question":"遮断機が上がり始めたら、完全に上がる前に進んでよい。","answer":false,"explanation":"安全が確認できるまで待ちます。"},{"no":5,"question":"踏切で車が動かなくなったら、非常ボタンや発炎筒などで列車へ知らせる。","answer":true,"explanation":"まず列車を止める行動が重要です。"},{"no":6,"question":"オートマ車でも、踏切内では急発進や急停止を避ける。","answer":true,"explanation":"脱輪や停止を防ぎます。"},{"no":7,"question":"踏切内での変速は、できるだけ避ける。","answer":true,"explanation":"エンスト防止の考え方です。"},{"no":8,"question":"自転車や歩行者が踏切内にいるときは、急かさず安全を確保する。","answer":true,"explanation":"弱者保護が優先です。"},{"no":9,"question":"踏切の向こう側に十分なスペースがなくても、遮断機が上がれば進む。","answer":false,"explanation":"出口側の空きが必要です。"},{"no":10,"question":"踏切の警報音は聞こえにくいこともあるので、目でも確認する。","answer":true,"explanation":"視覚と聴覚で確認します。"}],"titleI18n":{"ja":"踏切","en":"Railroad Crossings","ko":"철도 건널목","zhTW":"平交道","zhCN":"铁路道口","th":"ทางข้ามรถไฟ","vi":"Đường ngang đường sắt"}},{"id":9,"title":"駐車・停車","questions":[{"no":1,"question":"駐車禁止場所では、短時間でも駐車違反になることがある。","answer":true,"explanation":"停車と駐車の違いに注意します。"},{"no":2,"question":"交差点や横断歩道の近くでは、駐停車が制限される。","answer":true,"explanation":"見通しを悪くするため危険です。"},{"no":3,"question":"ハザードランプを点ければ、どこでも停車してよい。","answer":false,"explanation":"ハザードは免罪符ではありません。"},{"no":4,"question":"バス停付近では、バスの運行を妨げないよう注意する。","answer":true,"explanation":"停車禁止の範囲に注意します。"},{"no":5,"question":"坂道で駐車するときは、車が動き出さない措置を取る。","answer":true,"explanation":"ブレーキ、ギア、輪止め等を考えます。"},{"no":6,"question":"駐車場内は道路ではないので、歩行者への注意は不要である。","answer":false,"explanation":"駐車場事故は多く、徐行が必要です。"},{"no":7,"question":"ドアを開ける前に、後方から来る自転車や車を確認する。","answer":true,"explanation":"ドア開放事故を防ぎます。"},{"no":8,"question":"車から離れるときは、エンジン停止、施錠、盗難防止を行う。","answer":true,"explanation":"安全管理の基本です。"},{"no":9,"question":"消火栓や出入口の近くでは、駐車が制限されることがある。","answer":true,"explanation":"緊急活動や通行を妨げます。"},{"no":10,"question":"コインパーキング内なら、枠外に少しはみ出しても問題ない。","answer":false,"explanation":"他車や歩行者の通行を妨げます。"}],"titleI18n":{"ja":"駐車・停車","en":"Parking and Stopping","ko":"주차와 정차","zhTW":"停車與臨時停車","zhCN":"停车和临时停车","th":"การจอดและการหยุดรถ","vi":"Đỗ xe và dừng xe"}},{"id":10,"title":"二輪車・自転車への注意","questions":[{"no":1,"question":"左折時は、左側を走る二輪車や自転車を巻き込まないよう確認する。","answer":true,"explanation":"左後方確認が重要です。"},{"no":2,"question":"二輪車は小さいため、実際より遠く遅く見えることがある。","answer":true,"explanation":"速度と距離を見誤りやすいです。"},{"no":3,"question":"自転車は車道を走ることがあるので、追い越すときは間隔を取る。","answer":true,"explanation":"接触や風圧に注意します。"},{"no":4,"question":"自転車は軽車両なので、常に車と同じ速度で走れる。","answer":false,"explanation":"速度差を考えて安全に対応します。"},{"no":5,"question":"交差点で右折するとき、対向二輪車の存在に注意する。","answer":true,"explanation":"右直事故を防ぎます。"},{"no":6,"question":"雨の日の二輪車は滑りやすいので、急な割込みを避ける。","answer":true,"explanation":"転倒につながります。"},{"no":7,"question":"自転車横断帯や横断歩道付近では、自転車の動きにも注意する。","answer":true,"explanation":"急な進路変更があります。"},{"no":8,"question":"原付は常に自動車と同じ右折方法でよい。","answer":false,"explanation":"二段階右折が必要な場合があります。"},{"no":9,"question":"車の死角に二輪車が入ることがある。","answer":true,"explanation":"ミラーと目視で確認します。"},{"no":10,"question":"自転車に接近してクラクションを鳴らせば安全に追い越せる。","answer":false,"explanation":"驚かせて転倒させる危険があります。"}],"titleI18n":{"ja":"二輪車・自転車への注意","en":"Motorcycles and Bicycles","ko":"오토바이와 자전거","zhTW":"機車與自行車","zhCN":"摩托车和自行车","th":"รถจักรยานยนต์และจักรยาน","vi":"Xe máy và xe đạp"}},{"id":11,"title":"悪天候・夜間","questions":[{"no":1,"question":"雨の日は、晴天時より車間距離を長めに取る。","answer":true,"explanation":"制動距離が伸びます。"},{"no":2,"question":"霧の中では、ハイビームにすれば必ず見やすくなる。","answer":false,"explanation":"乱反射で見えにくくなる場合があります。"},{"no":3,"question":"夜間は速度感が鈍りやすい。","answer":true,"explanation":"速度超過に注意します。"},{"no":4,"question":"対向車がいるときは、ライトの向きに配慮する。","answer":true,"explanation":"眩惑を防ぎます。"},{"no":5,"question":"雪道や凍結路では、急発進、急ブレーキ、急ハンドルを避ける。","answer":true,"explanation":"スリップ防止の基本です。"},{"no":6,"question":"水たまりでは、歩行者への泥はねに注意する。","answer":true,"explanation":"速度を落として通過します。"},{"no":7,"question":"強風時、橋の上やトンネル出口では特に注意する。","answer":true,"explanation":"横風で車が流されます。"},{"no":8,"question":"夜間の歩行者は、ヘッドライトで必ず早く発見できる。","answer":false,"explanation":"服装や天候で見落としやすいです。"},{"no":9,"question":"大雨で視界が悪いときは、無理に走らず安全な場所で待機する選択もある。","answer":true,"explanation":"危険回避を優先します。"},{"no":10,"question":"ワイパーやライトの点検は、出発前の安全確認に含まれる。","answer":true,"explanation":"悪天候時に重要です。"}],"titleI18n":{"ja":"悪天候・夜間","en":"Bad Weather and Night Driving","ko":"악천후와 야간 운전","zhTW":"惡劣天氣與夜間駕駛","zhCN":"恶劣天气和夜间驾驶","th":"สภาพอากาศเลวร้ายและการขับรถกลางคืน","vi":"Thời tiết xấu và lái xe ban đêm"}},{"id":12,"title":"飲酒・薬・体調","questions":[{"no":1,"question":"少量の飲酒でも、運転能力は低下する。","answer":true,"explanation":"判断力や反応が鈍ります。"},{"no":2,"question":"酒を飲んだ翌朝なら、体内にアルコールが残っていても運転してよい。","answer":false,"explanation":"残酒運転に注意します。"},{"no":3,"question":"運転者に酒を勧めることも問題になる。","answer":true,"explanation":"飲酒運転を助長してはいけません。"},{"no":4,"question":"眠気を感じたら、休憩を取る。","answer":true,"explanation":"居眠り運転を防ぎます。"},{"no":5,"question":"薬の注意書きに「運転しないこと」とあれば、運転を避ける。","answer":true,"explanation":"副作用に注意します。"},{"no":6,"question":"体調不良でも、慣れた道なら安全に運転できる。","answer":false,"explanation":"判断力や集中力が落ちます。"},{"no":7,"question":"長距離運転では、計画的な休憩が重要である。","answer":true,"explanation":"疲労蓄積を防ぎます。"},{"no":8,"question":"運転前に体調と睡眠時間を確認するのは安全運転の一部である。","answer":true,"explanation":"事故予防につながります。"},{"no":9,"question":"同乗者が眠気に気づいた場合、運転者に休憩を促すのがよい。","answer":true,"explanation":"周囲の声かけも大切です。"},{"no":10,"question":"カフェインを取れば、睡眠不足でも長時間安全に運転できる。","answer":false,"explanation":"一時的な対策に過ぎません。"}],"titleI18n":{"ja":"飲酒・薬・体調","en":"Alcohol, Medicine, and Health","ko":"음주, 약, 건강 상태","zhTW":"飲酒、藥物與身體狀況","zhCN":"饮酒、药物和身体状况","th":"แอลกอฮอล์ ยา และสภาพร่างกาย","vi":"Rượu, thuốc và tình trạng sức khỏe"}},{"id":13,"title":"ながら運転・注意散漫","questions":[{"no":1,"question":"運転中にスマートフォン画面を注視してはいけない。","answer":true,"explanation":"視線が道路から外れます。"},{"no":2,"question":"信号待ちなら、周囲の安全確認をせずスマホ操作しても問題ない。","answer":false,"explanation":"発進遅れや安全確認不足につながります。"},{"no":3,"question":"カーナビ操作は、出発前や停車中に行うのが望ましい。","answer":true,"explanation":"走行中の操作は危険です。"},{"no":4,"question":"運転中の通話は、内容に気を取られることがある。","answer":true,"explanation":"注意力が低下します。"},{"no":5,"question":"落とした物を拾うために、走行中に足元を見てもよい。","answer":false,"explanation":"前方不注意になります。"},{"no":6,"question":"子どもや同乗者の世話は、安全な場所に止まって行う。","answer":true,"explanation":"走行中の脇見を避けます。"},{"no":7,"question":"音楽や動画の操作も、注意散漫の原因になる。","answer":true,"explanation":"操作は最小限にします。"},{"no":8,"question":"慣れた道では、少しくらい画面を見ても安全である。","answer":false,"explanation":"慣れた道ほど油断しやすいです。"},{"no":9,"question":"目的地設定は、走り始める前に済ませる。","answer":true,"explanation":"運転に集中できます。"},{"no":10,"question":"前方車両が急停止したとき、脇見していると対応が遅れる。","answer":true,"explanation":"追突事故の原因になります。"}],"titleI18n":{"ja":"ながら運転・注意散漫","en":"Distracted Driving","ko":"주의 산만 운전","zhTW":"分心駕駛","zhCN":"分心驾驶","th":"การขับขี่โดยเสียสมาธิ","vi":"Lái xe mất tập trung"}},{"id":14,"title":"あおり運転・マナー","questions":[{"no":1,"question":"車間距離を極端に詰める行為は危険である。","answer":true,"explanation":"追突や威圧につながります。"},{"no":2,"question":"遅い車に対して、執拗にパッシングしてよい。","answer":false,"explanation":"妨害運転と評価されるおそれがあります。"},{"no":3,"question":"急な割込みや幅寄せは、重大事故につながる。","answer":true,"explanation":"進路変更は安全確認が必要です。"},{"no":4,"question":"トラブルになりそうなときは、挑発に乗らず安全な場所へ移動する。","answer":true,"explanation":"冷静な対応が大切です。"},{"no":5,"question":"ドライブレコーダーは、事故やトラブル時の記録に役立つことがある。","answer":true,"explanation":"客観的記録になります。"},{"no":6,"question":"前の車が遅いと感じたら、追越禁止場所でも追い越してよい。","answer":false,"explanation":"標識や標示に従います。"},{"no":7,"question":"合流車がいるときは、状況に応じて速度や車間距離を調整する。","answer":true,"explanation":"円滑な交通に役立ちます。"},{"no":8,"question":"クラクションは、怒りを伝えるために使うものではない。","answer":true,"explanation":"危険防止が目的です。"},{"no":9,"question":"狭い道では、譲り合いと減速が重要である。","answer":true,"explanation":"接触事故を防ぎます。"},{"no":10,"question":"あおられたと感じたら、急ブレーキで相手を止めるのがよい。","answer":false,"explanation":"さらに危険な状況になります。"}],"titleI18n":{"ja":"あおり運転・マナー","en":"Aggressive Driving and Manners","ko":"난폭 운전과 운전 예절","zhTW":"危險駕駛與禮讓","zhCN":"危险驾驶和礼让","th":"การขับขี่ก้าวร้าวและมารยาท","vi":"Lái xe gây nguy hiểm và văn hóa nhường đường"}},{"id":15,"title":"レンタカー・観光地","questions":[{"no":1,"question":"レンタカー出発前に、ライト、ワイパー、給油口、ナビの操作を確認する。","answer":true,"explanation":"慣れない車では重要です。"},{"no":2,"question":"観光地では、景色を見るために急停止してもよい。","answer":false,"explanation":"後続車に危険です。"},{"no":3,"question":"狭い山道では、対向車や歩行者に注意して速度を落とす。","answer":true,"explanation":"見通しが悪い場所が多いです。"},{"no":4,"question":"雪国では、スタッドレスタイヤやチェーン規制を確認する。","answer":true,"explanation":"季節装備が必要です。"},{"no":5,"question":"駐車場の精算機や出口で戸惑うときは、後続車に注意する。","answer":true,"explanation":"焦らず安全を優先します。"},{"no":6,"question":"慣れない右左折では、標識と車線を早めに確認する。","answer":true,"explanation":"直前の進路変更を避けます。"},{"no":7,"question":"観光バスや歩行者が多い場所では、普段より慎重に走る。","answer":true,"explanation":"予測しにくい動きがあります。"},{"no":8,"question":"レンタカーの事故は小さな傷なら報告しなくてよい。","answer":false,"explanation":"契約や保険手続きに従います。"},{"no":9,"question":"道に迷ったら、走りながらスマホで地図を確認する。","answer":false,"explanation":"安全な場所に停止して確認します。"},{"no":10,"question":"外国人同乗者にも、シートベルト着用を案内する。","answer":true,"explanation":"全席着用が必要です。"}],"titleI18n":{"ja":"レンタカー・観光地","en":"Rental Cars and Tourist Areas","ko":"렌터카와 관광지","zhTW":"租車與觀光地區","zhCN":"租车和观光地","th":"รถเช่าและแหล่งท่องเที่ยว","vi":"Xe thuê và khu du lịch"}},{"id":16,"title":"高齢ドライバーの再確認","questions":[{"no":1,"question":"年齢に関係なく、視力や反応速度の変化に注意する。","answer":true,"explanation":"定期的な自己点検が大切です。"},{"no":2,"question":"慣れた道では、標識の変化を確認しなくてもよい。","answer":false,"explanation":"規制が変わることがあります。"},{"no":3,"question":"右左折時は、首を動かして死角を確認する。","answer":true,"explanation":"ミラーだけでは不十分な場合があります。"},{"no":4,"question":"夕暮れ時は早めにライトを点灯する。","answer":true,"explanation":"自車を見つけてもらう効果もあります。"},{"no":5,"question":"ペダルの踏み間違いを防ぐため、発進前に足元を落ち着いて確認する。","answer":true,"explanation":"急発進事故を防ぎます。"},{"no":6,"question":"駐車場では速度が低いので、重大事故は起きにくい。","answer":false,"explanation":"歩行者との事故が起こり得ます。"},{"no":7,"question":"疲れた日は、運転を控える判断も安全運転である。","answer":true,"explanation":"無理をしないことが重要です。"},{"no":8,"question":"新しい安全装置がある車でも、運転者の安全確認は必要である。","answer":true,"explanation":"装置に頼りきらないようにします。"},{"no":9,"question":"交通ルールは昔から変わらないので、学び直しは不要である。","answer":false,"explanation":"法改正や運用変更があります。"},{"no":10,"question":"家族から運転を心配されたら、運転環境や時間帯を見直す機会にする。","answer":true,"explanation":"事故予防につながります。"}],"titleI18n":{"ja":"高齢ドライバーの再確認","en":"Review for Senior Drivers","ko":"고령 운전자 복습","zhTW":"高齡駕駛人複習","zhCN":"高龄驾驶人复习","th":"ทบทวนสำหรับผู้ขับขี่สูงอายุ","vi":"Ôn tập cho người lái cao tuổi"}},{"id":17,"title":"標示・車線・進路変更","questions":[{"no":1,"question":"黄色の実線は、原則として車線変更のために越えてはいけない。","answer":true,"explanation":"追越しや進路変更の規制に注意します。"},{"no":2,"question":"白い破線なら、常に安全確認なしで車線変更してよい。","answer":false,"explanation":"安全確認と合図が必要です。"},{"no":3,"question":"右左折専用レーンでは、矢印の方向に従う。","answer":true,"explanation":"直進できない場合があります。"},{"no":4,"question":"ゼブラゾーンは、車両通行が完全に禁止された場所である。","answer":false,"explanation":"導流帯であり、積極的な走行は望ましくありません。"},{"no":5,"question":"進路変更の前には、ミラー確認、合図、目視確認を行う。","answer":true,"explanation":"死角の車両を確認します。"},{"no":6,"question":"バス専用・優先レーンは、時間帯や車種条件を確認する。","answer":true,"explanation":"補助標識が重要です。"},{"no":7,"question":"交差点直前での車線変更は、事故や違反につながりやすい。","answer":true,"explanation":"早めに進路を決めます。"},{"no":8,"question":"路面の矢印は、標識より常に優先される。","answer":false,"explanation":"標識、標示、信号を総合して従います。"},{"no":9,"question":"工事中の仮設標識や誘導員の指示にも注意する。","answer":true,"explanation":"通常と異なる交通整理があります。"},{"no":10,"question":"車線が減少する場所では、早めに合図して安全に合流する。","answer":true,"explanation":"無理な割込みを避けます。"}],"titleI18n":{"ja":"標示・車線・進路変更","en":"Road Markings, Lanes, and Lane Changes","ko":"노면 표시, 차로, 진로 변경","zhTW":"道路標線、車道與變換車道","zhCN":"道路标线、车道和变更车道","th":"เครื่องหมายบนถนน ช่องจราจร และการเปลี่ยนช่อง","vi":"Vạch kẻ đường, làn đường và chuyển làn"}},{"id":18,"title":"事故・故障・緊急時","questions":[{"no":1,"question":"事故が起きたら、負傷者救護と危険防止を優先する。","answer":true,"explanation":"まず人命と二次事故防止です。"},{"no":2,"question":"物損だけなら、警察へ連絡しなくてもよい。","answer":false,"explanation":"事故は警察への届出が必要です。"},{"no":3,"question":"高速道路で停止したら、後続車に注意して安全な場所へ避難する。","answer":true,"explanation":"車内待機は危険な場合があります。"},{"no":4,"question":"故障時は、ハザードや停止表示器材で後続車へ知らせる。","answer":true,"explanation":"二次事故を防ぎます。"},{"no":5,"question":"トンネル内で故障した場合、非常電話や非常口の位置を確認する。","answer":true,"explanation":"速やかな通報と避難が必要です。"},{"no":6,"question":"軽い接触事故なら、その場で口約束だけして立ち去ってよい。","answer":false,"explanation":"後日のトラブルを避けるため届出します。"},{"no":7,"question":"事故現場では、むやみに道路上へ立ち続けない。","answer":true,"explanation":"後続車との事故を防ぎます。"},{"no":8,"question":"発炎筒の使い方は、事前に確認しておくとよい。","answer":true,"explanation":"緊急時に慌てにくくなります。"},{"no":9,"question":"レンタカー事故では、警察、レンタカー会社、保険会社の指示に従う。","answer":true,"explanation":"契約上の手続きが必要です。"},{"no":10,"question":"緊急車両が近づいたら、道路状況に応じて進路を譲る。","answer":true,"explanation":"サイレンや赤色灯に注意します。"}],"titleI18n":{"ja":"事故・故障・緊急時","en":"Accidents, Breakdowns, and Emergencies","ko":"사고, 고장, 긴급 상황","zhTW":"事故、故障與緊急情況","zhCN":"事故、故障和紧急情况","th":"อุบัติเหตุ รถเสีย และเหตุฉุกเฉิน","vi":"Tai nạn, hỏng xe và khẩn cấp"}},{"id":19,"title":"最近のルール・注意テーマ","questions":[{"no":1,"question":"ながらスマホは、近年特に厳しく扱われる危険行為である。","answer":true,"explanation":"重大事故につながります。"},{"no":2,"question":"あおり運転は、免許取消しなど厳しい処分の対象になり得る。","answer":true,"explanation":"妨害運転は重大な違反です。"},{"no":3,"question":"後席シートベルトは、高速道路だけ意識すればよい。","answer":false,"explanation":"一般道路でも着用が必要です。"},{"no":4,"question":"高齢運転者は、自分の変化に合わせて運転時間帯や経路を見直すとよい。","answer":true,"explanation":"安全な運転環境を選びます。"},{"no":5,"question":"電動キックボードなど新しい乗り物があるため、交差点では周囲をよく見る。","answer":true,"explanation":"予測しにくい動きがあります。"},{"no":6,"question":"2026年9月1日以降は、中央線や車両通行帯がない一般道路の速度ルールに注意する。","answer":true,"explanation":"法定速度の見直し予定があります。"},{"no":7,"question":"自転車の交通違反は、今後も取締りや制度変更の対象になり得る。","answer":true,"explanation":"周辺交通として注意が必要です。"},{"no":8,"question":"道路標識は昔と同じなので、更新された表示を確認する必要はない。","answer":false,"explanation":"標識や表示は変更されることがあります。"},{"no":9,"question":"カーナビの案内が道路標識と違う場合、道路標識に従う。","answer":true,"explanation":"現場の交通規制が優先です。"},{"no":10,"question":"自動運転支援があれば、運転者は前方を見なくてもよい。","answer":false,"explanation":"運転者の監視と安全確認が必要です。"}],"titleI18n":{"ja":"最近のルール・注意テーマ","en":"Recent Rule Topics","ko":"최근 규칙 주요 사항","zhTW":"近期規則重點","zhCN":"近期规则重点","th":"หัวข้อกฎล่าสุด","vi":"Chủ đề quy tắc gần đây"}},{"id":20,"title":"総合確認","questions":[{"no":1,"question":"日本では左側通行、右折時は対向直進車に注意する。","answer":true,"explanation":"基本中の基本です。"},{"no":2,"question":"赤信号でも左折できる国があるが、日本では原則できない。","answer":true,"explanation":"外国人向けに重要です。"},{"no":3,"question":"横断歩道で歩行者が待っているとき、車が優先である。","answer":false,"explanation":"歩行者優先です。"},{"no":4,"question":"一時停止は、車輪が完全に止まる必要がある。","answer":true,"explanation":"徐行では不十分です。"},{"no":5,"question":"踏切では、前方に空きがあるか確認してから入る。","answer":true,"explanation":"踏切内停止を防ぎます。"},{"no":6,"question":"追越し後、高速道路の追越車線に居続けてよい。","answer":false,"explanation":"走行車線へ戻ります。"},{"no":7,"question":"雨や雪の日は、制限速度以下でも危険な場合がある。","answer":true,"explanation":"状況に応じた安全速度が必要です。"},{"no":8,"question":"運転中のスマホ注視は、短時間なら問題ない。","answer":false,"explanation":"短時間でも危険です。"},{"no":9,"question":"事故時は、けが人救護、危険防止、警察連絡を行う。","answer":true,"explanation":"基本対応です。"},{"no":10,"question":"交通ルールは変わるため、免許取得後も学び直しが必要である。","answer":true,"explanation":"安全運転のために重要です。"}],"titleI18n":{"ja":"総合確認","en":"General Review","ko":"종합 확인","zhTW":"綜合確認","zhCN":"综合复习","th":"ทบทวนรวม","vi":"Ôn tập tổng hợp"}}];
+    const messages = {
+      ja: {
+        title: "日本の交通ルール ○×クイズ",
+        lead: "道路交通法に沿った表現を意識した学習用たたき台です。1回10問、採点すると正解数に応じて車がゴールへ進みます。",
+        random: "ランダム",
+        answered: "回答済み",
+        score: "正解数",
+        grade: "採点する",
+        retry: "やり直す",
+        waitingTitle: "採点待ち",
+        waitingBody: "10問すべてに○か×を入れてから採点してください。",
+        correct: "正解。",
+        wrong: "不正解。",
+        yourAnswer: "あなたの回答",
+        correctAnswer: "正解",
+        gradingTitle: "採点中",
+        gradingBody: "車がゴールへ向かっています。",
+        greatTitle: "全問正解おめでとう",
+        goodTitle: "もう少し",
+        retryTitle: "頑張ろう",
+        greatBody: "安全確認の基本がよく押さえられています。実際の道路では、標識と現場の状況を必ず優先してください。",
+        goodBody: "基本はかなり押さえられています。迷った問題をもう一度見ると、実運転での判断が安定します。",
+        retryBody: "間違えた問題の解説を読み、標識・横断歩道・一時停止を重点的に復習しましょう。",
+        ofTen: "問正解 / 10問中",
+        original: "日本語原文",
+        pending: "この問題は翻訳準備中のため、日本語原文を表示しています。",
+        notice: "注: これは教材案です。公開・配布前には、最新の道路交通法、道路交通法施行令、警察庁資料、JAF資料等で法令確認してください。"
+      },
+      en: {
+        title: "Japan Traffic Rules True/False Quiz",
+        lead: "A learning draft based on Japanese road traffic rules. Answer 10 questions; after grading, the car moves according to your correct answers.",
+        random: "Random",
+        answered: "Answered",
+        score: "Score",
+        grade: "Grade",
+        retry: "Retry",
+        waitingTitle: "Waiting",
+        waitingBody: "Answer all 10 questions with true or false before grading.",
+        correct: "Correct. ",
+        wrong: "Incorrect. ",
+        yourAnswer: "Your answer",
+        correctAnswer: "Correct answer",
+        gradingTitle: "Grading",
+        gradingBody: "The car is moving toward the goal.",
+        greatTitle: "Perfect Score. Congratulations!",
+        goodTitle: "Almost There",
+        retryTitle: "Keep Going",
+        greatBody: "You have a strong grasp of basic safety checks. On real roads, always follow signs and actual road conditions.",
+        goodBody: "You understand many basics. Reviewing uncertain questions will help your real-world driving decisions.",
+        retryBody: "Read the explanations for missed questions and review signs, crosswalks, and complete stops.",
+        ofTen: " correct out of 10",
+        original: "Japanese original",
+        pending: "Translation for this item is being prepared; the Japanese original is shown.",
+        notice: "Note: This is a draft learning tool. Before publication or distribution, verify it against the latest Road Traffic Act, enforcement orders, National Police Agency materials, JAF materials, and local rules."
+      },
+      zhCN: {
+        title: "日本交通规则 对错测验",
+        lead: "这是按照日本道路交通规则制作的学习草案。每次10题，评分后汽车会根据正确题数前进。",
+        random: "随机",
+        answered: "已回答",
+        score: "正确数",
+        grade: "评分",
+        retry: "重新开始",
+        waitingTitle: "等待评分",
+        waitingBody: "请先完成10题的○或×选择，然后评分。",
+        correct: "正确。",
+        wrong: "错误。",
+        yourAnswer: "你的回答",
+        correctAnswer: "正确答案",
+        gradingTitle: "评分中",
+        gradingBody: "汽车正在向终点前进。",
+        greatTitle: "全部答对，恭喜！",
+        goodTitle: "差一点",
+        retryTitle: "继续加油",
+        greatBody: "你已经掌握了安全确认的基本要点。实际驾驶时，请务必遵守标志和现场情况。",
+        goodBody: "你已经掌握了很多基本内容。复习不确定的问题会让实际驾驶判断更稳定。",
+        retryBody: "请阅读答错题目的说明，重点复习标志、人行横道和完全停车。",
+        ofTen: "题正确 / 共10题",
+        original: "日语原文",
+        pending: "本题翻译正在准备中，因此显示日语原文。",
+        notice: "注：这是学习教材草案。公开或分发前，请根据最新的日本道路交通法、施行令、警察厅资料、JAF资料和当地规定进行确认。"
+      },
+      zhTW: {
+        title: "日本交通規則 對錯測驗",
+        lead: "這是依照日本道路交通規則製作的學習草案。每次10題，評分後汽車會依照答對題數前進。",
+        random: "隨機",
+        answered: "已回答",
+        score: "答對數",
+        grade: "評分",
+        retry: "重新開始",
+        waitingTitle: "等待評分",
+        waitingBody: "請先完成10題的○或×選擇，然後評分。",
+        correct: "正確。",
+        wrong: "錯誤。",
+        yourAnswer: "你的回答",
+        correctAnswer: "正確答案",
+        gradingTitle: "評分中",
+        gradingBody: "汽車正在往終點前進。",
+        greatTitle: "全部答對，恭喜！",
+        goodTitle: "差一點",
+        retryTitle: "繼續加油",
+        greatBody: "你已經掌握了安全確認的基本要點。實際駕駛時，請務必遵守標誌與現場狀況。",
+        goodBody: "你已經掌握了許多基本內容。複習不確定的問題會讓實際駕駛判斷更穩定。",
+        retryBody: "請閱讀答錯題目的說明，重點複習標誌、行人穿越道與完全停車。",
+        ofTen: "題正確 / 共10題",
+        original: "日文原文",
+        pending: "本題翻譯準備中，因此顯示日文原文。",
+        notice: "註：這是學習教材草案。公開或分發前，請依照最新的日本道路交通法、施行令、警察廳資料、JAF資料與當地規定進行確認。"
+      },
+      ko: {
+        title: "일본 교통 법규 O/X 퀴즈",
+        lead: "일본 도로교통법에 맞춘 표현을 의식한 학습용 초안입니다. 10문제를 풀면 정답 수만큼 자동차가 앞으로 갑니다.",
+        random: "무작위",
+        answered: "응답 완료",
+        score: "정답 수",
+        grade: "채점하기",
+        retry: "다시 하기",
+        waitingTitle: "채점 대기",
+        waitingBody: "10문제 모두에 O 또는 X를 선택한 뒤 채점하세요.",
+        correct: "정답.",
+        wrong: "오답.",
+        yourAnswer: "내 답",
+        correctAnswer: "정답",
+        gradingTitle: "채점 중",
+        gradingBody: "자동차가 목표 지점으로 이동하고 있습니다.",
+        greatTitle: "전부 정답입니다. 축하합니다!",
+        goodTitle: "조금만 더",
+        retryTitle: "힘내자",
+        greatBody: "안전 확인의 기본을 잘 이해하고 있습니다. 실제 도로에서는 표지와 현장 상황을 반드시 우선하세요.",
+        goodBody: "기본을 꽤 잘 이해하고 있습니다. 헷갈린 문제를 다시 보면 실제 운전 판단이 더 안정됩니다.",
+        retryBody: "틀린 문제의 해설을 읽고 표지, 횡단보도, 완전 정지를 중점적으로 복습하세요.",
+        ofTen: "문제 정답 / 10문제 중",
+        original: "일본어 원문",
+        pending: "이 문제는 번역 준비 중이므로 일본어 원문을 표시합니다.",
+        notice: "주의: 이것은 학습용 초안입니다. 공개 또는 배포 전에는 최신 도로교통법, 시행령, 경찰청 자료, JAF 자료 및 지역 규정을 확인하세요."
+      },
+      th: {
+        title: "แบบทดสอบกฎจราจรญี่ปุ่น O/X",
+        lead: "แบบร่างเพื่อการเรียนรู้ตามกฎจราจรของญี่ปุ่น ครั้งละ 10 ข้อ เมื่อให้คะแนน รถจะวิ่งไปตามจำนวนข้อที่ตอบถูก",
+        random: "สุ่ม",
+        answered: "ตอบแล้ว",
+        score: "จำนวนข้อถูก",
+        grade: "ให้คะแนน",
+        retry: "เริ่มใหม่",
+        waitingTitle: "รอให้คะแนน",
+        waitingBody: "กรุณาเลือก ○ หรือ × ให้ครบทั้ง 10 ข้อก่อนให้คะแนน",
+        correct: "ถูกต้อง",
+        wrong: "ไม่ถูกต้อง",
+        yourAnswer: "คำตอบของคุณ",
+        correctAnswer: "คำตอบที่ถูกต้อง",
+        gradingTitle: "กำลังให้คะแนน",
+        gradingBody: "รถกำลังวิ่งไปยังเส้นชัย",
+        greatTitle: "ตอบถูกทุกข้อ ยินดีด้วย!",
+        goodTitle: "อีกนิดเดียว",
+        retryTitle: "พยายามต่อไป",
+        greatBody: "คุณเข้าใจพื้นฐานการตรวจสอบความปลอดภัยได้ดีมาก เมื่อต้องขับจริง โปรดให้ความสำคัญกับป้ายจราจรและสภาพถนนจริงเสมอ",
+        goodBody: "คุณเข้าใจพื้นฐานได้ค่อนข้างดี การทบทวนข้อที่ลังเลจะช่วยให้ตัดสินใจขณะขับจริงได้มั่นคงขึ้น",
+        retryBody: "อ่านคำอธิบายของข้อที่ตอบผิด และทบทวนป้ายจราจร ทางม้าลาย และการหยุดรถให้สนิท",
+        ofTen: " ข้อถูก / จาก 10 ข้อ",
+        original: "ต้นฉบับภาษาญี่ปุ่น",
+        pending: "ข้อนี้อยู่ระหว่างเตรียมคำแปล จึงแสดงต้นฉบับภาษาญี่ปุ่น",
+        notice: "หมายเหตุ: นี่เป็นแบบร่างสื่อการเรียนรู้ ก่อนเผยแพร่หรือแจกจ่าย โปรดตรวจสอบกับกฎหมายจราจรทางบกของญี่ปุ่น คำสั่งบังคับใช้ เอกสารสำนักงานตำรวจแห่งชาติญี่ปุ่น เอกสาร JAF และกฎท้องถิ่นล่าสุด"
+      },
+      vi: {
+        title: "Câu đố Đúng/Sai về luật giao thông Nhật Bản",
+        lead: "Bản nháp học tập theo quy tắc giao thông Nhật Bản. Mỗi lần 10 câu; sau khi chấm điểm, xe sẽ tiến lên theo số câu đúng.",
+        random: "Ngẫu nhiên",
+        answered: "Đã trả lời",
+        score: "Số câu đúng",
+        grade: "Chấm điểm",
+        retry: "Làm lại",
+        waitingTitle: "Chờ chấm điểm",
+        waitingBody: "Hãy chọn ○ hoặc × cho đủ 10 câu trước khi chấm điểm.",
+        correct: "Đúng.",
+        wrong: "Sai.",
+        yourAnswer: "Câu trả lời của bạn",
+        correctAnswer: "Đáp án đúng",
+        gradingTitle: "Đang chấm điểm",
+        gradingBody: "Xe đang chạy về đích.",
+        greatTitle: "Đúng toàn bộ, xin chúc mừng!",
+        goodTitle: "Chỉ còn một chút nữa",
+        retryTitle: "Cố gắng lên",
+        greatBody: "Bạn đã nắm tốt các điểm cơ bản về kiểm tra an toàn. Khi lái xe thực tế, hãy luôn ưu tiên biển báo và tình huống tại hiện trường.",
+        goodBody: "Bạn đã nắm khá nhiều kiến thức cơ bản. Ôn lại những câu còn phân vân sẽ giúp phán đoán khi lái xe ổn định hơn.",
+        retryBody: "Hãy đọc giải thích của các câu sai và ôn kỹ biển báo, vạch sang đường và việc dừng hẳn.",
+        ofTen: " câu đúng / trong 10 câu",
+        original: "Nguyên văn tiếng Nhật",
+        pending: "Câu này đang được chuẩn bị bản dịch, nên hiển thị nguyên văn tiếng Nhật.",
+        notice: "Lưu ý: Đây là bản nháp tài liệu học tập. Trước khi công bố hoặc phân phát, hãy kiểm tra với Luật Giao thông đường bộ Nhật Bản, nghị định thi hành, tài liệu của Cơ quan Cảnh sát Quốc gia, tài liệu JAF và quy định địa phương mới nhất."
+      }
+    };
+
+    const patternSelect = document.getElementById("patternSelect");
+    const languageSelect = document.getElementById("languageSelect");
+    const quizTitle = document.getElementById("quizTitle");
+    const questionList = document.getElementById("questionList");
+    const progressText = document.getElementById("progressText");
+    const answeredCount = document.getElementById("answeredCount");
+    const scoreCount = document.getElementById("scoreCount");
+    const gradeButton = document.getElementById("gradeButton");
+    const resetButton = document.getElementById("resetButton");
+    const shuffleButton = document.getElementById("shuffleButton");
+    const resultBox = document.getElementById("resultBox");
+    const car = document.getElementById("car");
+    const road = document.getElementById("road");
+    let currentPattern = patterns[0];
+    let currentLang = "ja";
+    let graded = false;
+
+    function t(key) { return messages[currentLang][key] || messages.ja[key]; }
+    function localTitle(pattern) { return (pattern.titleI18n && pattern.titleI18n[currentLang]) || pattern.title; }
+    function localizedQuestion(item) {
+      if (currentLang === "ja") return { question: item.question, explanation: item.explanation, translated: true };
+      const translated = item.i18n && item.i18n[currentLang];
+      if (translated) return { question: translated.question, explanation: translated.explanation, translated: true };
+      return { question: item.question, explanation: item.explanation, translated: false };
+    }
+    function mark(value) { return value ? "○" : "×"; }
+
+    function renderStaticText() {
+      document.documentElement.lang = currentLang;
+      document.getElementById("appTitle").textContent = t("title");
+      document.getElementById("appLead").textContent = t("lead");
+      document.getElementById("answeredLabel").textContent = t("answered");
+      document.getElementById("scoreLabel").textContent = t("score");
+      gradeButton.textContent = t("grade");
+      resetButton.textContent = t("retry");
+      shuffleButton.textContent = t("random");
+      document.getElementById("noticeText").textContent = t("notice");
+      document.title = t("title");
+    }
+
+    function renderOptions() {
+      patternSelect.innerHTML = patterns.map((pattern, index) => {
+        const label = String(pattern.id).padStart(2, "0") + " " + localTitle(pattern);
+        return '<option value="' + index + '">' + escapeHtml(label) + '</option>';
+      }).join("");
+      patternSelect.value = String(patterns.indexOf(currentPattern));
+    }
+
+    function renderQuiz(pattern) {
+      currentPattern = pattern;
+      graded = false;
+      quizTitle.textContent = "Pattern " + pattern.id + " / " + localTitle(pattern);
+      scoreCount.textContent = "-";
+      resultBox.innerHTML = "<h2>" + escapeHtml(t("waitingTitle")) + "</h2><p>" + escapeHtml(t("waitingBody")) + "</p>";
+      moveCar(0);
+      questionList.innerHTML = pattern.questions.map((item, index) => {
+        const name = "q" + index;
+        const local = localizedQuestion(item);
+        const original = currentLang !== "ja" && local.translated ? '<span class="original">' + escapeHtml(t("original")) + ': ' + escapeHtml(item.question) + '</span>' : "";
+        const pending = currentLang !== "ja" && !local.translated ? '<span class="pending">' + escapeHtml(t("pending")) + '</span>' : "";
+        return [
+          '<article class="question" data-index="' + index + '">',
+          '<div class="num">' + item.no + '</div>',
+          '<div class="qtext">' + escapeHtml(local.question) + original + pending + '</div>',
+          '<div class="answer-box">',
+          '<input id="' + name + '-true" name="' + name + '" type="radio" value="true">',
+          '<label for="' + name + '-true" title="True">○</label>',
+          '<input id="' + name + '-false" name="' + name + '" type="radio" value="false">',
+          '<label for="' + name + '-false" title="False">×</label>',
+          '</div>',
+          '<p class="explain"></p>',
+          '</article>'
+        ].join("");
+      }).join("");
+      questionList.querySelectorAll("input").forEach((input) => input.addEventListener("change", updateProgress));
+      updateProgress();
+    }
+
+    function updateProgress() {
+      const answered = getAnswers().filter((value) => value !== null).length;
+      answeredCount.textContent = answered;
+      progressText.textContent = answered + " / " + currentPattern.questions.length;
+      gradeButton.disabled = answered !== currentPattern.questions.length;
+      if (!graded) scoreCount.textContent = "-";
+    }
+    function getAnswers() {
+      return currentPattern.questions.map((_, index) => {
+        const checked = questionList.querySelector('input[name="q' + index + '"]:checked');
+        return checked ? checked.value === "true" : null;
+      });
+    }
+    function grade() {
+      const answers = getAnswers();
+      let score = 0;
+      graded = true;
+      currentPattern.questions.forEach((item, index) => {
+        const card = questionList.querySelector('[data-index="' + index + '"]');
+        const ok = answers[index] === item.answer;
+        if (ok) score += 1;
+        card.classList.toggle("correct", ok);
+        card.classList.toggle("wrong", !ok);
+        const local = localizedQuestion(item);
+        card.querySelector(".explain").textContent =
+          (ok ? t("correct") : t("wrong") + t("yourAnswer") + ": " + mark(answers[index]) + " / " + t("correctAnswer") + ": " + mark(item.answer) + "。") + local.explanation;
+      });
+      scoreCount.textContent = score;
+      resultBox.innerHTML = "<h2>" + escapeHtml(t("gradingTitle")) + "</h2><p>" + escapeHtml(t("gradingBody")) + "</p>";
+      const duration = moveCar(score, true);
+      window.setTimeout(() => showResult(score), duration * 1000);
+    }
+    function showResult(score) {
+      const percent = Math.round(score / currentPattern.questions.length * 100);
+      let title = t("retryTitle");
+      let message = t("retryBody");
+      let rewardClass = "reward-try";
+      if (score === 10) {
+        title = t("greatTitle");
+        message = t("greatBody");
+        rewardClass = "reward-perfect";
+      } else if (score >= 8) {
+        title = t("goodTitle");
+        message = t("goodBody");
+        rewardClass = "reward-almost";
+      }
+      const scoreText = currentLang === "en" ? score + t("ofTen") + " (" + percent + "%)" : score + t("ofTen") + "（" + percent + "%）";
+      resultBox.innerHTML = '<div class="reward ' + rewardClass + '"><strong>' + escapeHtml(title) + '</strong></div><p>' + escapeHtml(scoreText) + '</p><p>' + escapeHtml(message) + '</p>';
+    }
+    function moveCar(score, animated = false) {
+      const duration = animated ? Math.max(.5, score * .5) : .35;
+      car.style.transitionDuration = duration + "s";
+      requestAnimationFrame(() => {
+        const max = Math.max(0, road.clientWidth - 78);
+        car.style.transform = "translateX(" + Math.round(max * (score / 10)) + "px)";
+      });
+      return duration;
+    }
+    function reset() { renderQuiz(currentPattern); }
+    function randomPattern() {
+      const index = Math.floor(Math.random() * patterns.length);
+      patternSelect.value = String(index);
+      renderQuiz(patterns[index]);
+    }
+    function changeLanguage(lang) {
+      currentLang = lang;
+      renderStaticText();
+      renderOptions();
+      renderQuiz(currentPattern);
+    }
+    function escapeHtml(value) {
+      return String(value).replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" }[char]));
+    }
+    patternSelect.addEventListener("change", () => renderQuiz(patterns[Number(patternSelect.value)]));
+    languageSelect.addEventListener("change", () => changeLanguage(languageSelect.value));
+    gradeButton.addEventListener("click", grade);
+    resetButton.addEventListener("click", reset);
+    shuffleButton.addEventListener("click", randomPattern);
+    window.addEventListener("resize", () => { if (graded) moveCar(Number(scoreCount.textContent) || 0); });
+    renderStaticText();
+    renderOptions();
+    renderQuiz(patterns[0]);
+  </script>
+</body>
+</html>
