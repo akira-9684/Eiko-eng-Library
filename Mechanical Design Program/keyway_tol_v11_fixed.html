@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>キー溝公差ヘルパー v1.1 (JIS B 1301 平行キー / AutoCAD書式)</title>
+<style>
+  :root{
+    --bg:#f4f6f9; --card:#ffffff; --line:#d7dde5; --txt:#1e2a38; --sub:#5c6b7c;
+    --accent:#0b62b8; --shaft:#0b62b8; --hub:#b8560b; --ng:#c62828; --ok:#2e7d32;
+  }
+  *{box-sizing:border-box;}
+  body{font-family:"Segoe UI","Meiryo",sans-serif; background:var(--bg); color:var(--txt); margin:0; padding:16px;}
+  .wrap{max-width:960px; margin:0 auto;}
+  h1{font-size:18px; margin:0 0 2px;}
+  .ver{font-size:12px; color:var(--sub); margin-bottom:14px;}
+  .card{background:var(--card); border:1px solid var(--line); border-radius:8px; padding:14px 16px; margin-bottom:14px;}
+  .row{display:flex; flex-wrap:wrap; gap:14px; align-items:flex-end;}
+  label{font-size:12px; color:var(--sub); display:block; margin-bottom:3px;}
+  input[type=number], select{font-size:16px; padding:6px 8px; border:1px solid var(--line); border-radius:6px; width:130px; background:#fff; color:var(--txt);}
+  select{width:auto; min-width:130px;}
+  .formsel{display:flex; gap:0; border:1px solid var(--line); border-radius:6px; overflow:hidden;}
+  .formsel button{font-size:14px; padding:7px 14px; border:none; background:#fff; cursor:pointer; color:var(--sub); border-right:1px solid var(--line);}
+  .formsel button:last-child{border-right:none;}
+  .formsel button.act{background:var(--accent); color:#fff; font-weight:bold;}
+  .keyinfo{font-size:14px; margin-top:10px; color:var(--txt);}
+  .keyinfo b{font-size:17px;}
+  .ngmsg{color:var(--ng); font-weight:bold; font-size:14px; margin-top:10px; display:none;}
+  .panes{display:flex; gap:14px; flex-wrap:wrap;}
+  .pane{flex:1 1 460px; background:var(--card); border:1px solid var(--line); border-radius:8px; overflow:hidden;}
+  .pane h2{font-size:15px; margin:0; padding:9px 14px; color:#fff;}
+  .pane.shaft h2{background:var(--shaft);}
+  .pane.hub h2{background:var(--hub);}
+  .pane .body{padding:12px 14px;}
+  .figbox{text-align:center; padding:4px 0 10px;}
+  table{border-collapse:collapse; width:100%; font-size:14px; table-layout:fixed;}
+  th,td{border-bottom:1px solid var(--line); padding:7px 4px; text-align:left; vertical-align:middle; white-space:nowrap;}
+  th{color:var(--sub); font-size:12px; font-weight:normal; white-space:nowrap;}
+  th:nth-child(1),td:nth-child(1){width:108px;}
+  th:nth-child(2),td:nth-child(2){width:138px;}
+  th:nth-child(3),td:nth-child(3){width:148px;}
+  th:nth-child(4),td:nth-child(4){width:58px;}
+  td.val{font-family:Consolas,"Courier New",monospace; font-size:12px; white-space:nowrap;}
+  td.acad{font-family:Consolas,"Courier New",monospace; font-size:12px; white-space:nowrap; color:var(--accent);}
+  td:last-child{text-align:right;}
+  .cpy{font-size:12px; padding:3px 8px; border:1px solid var(--accent); color:var(--accent); background:#fff; border-radius:5px; cursor:pointer; white-space:nowrap; writing-mode:horizontal-tb;}
+  .cpy:hover{background:var(--accent); color:#fff;}
+  .cpy.done{background:var(--ok); border-color:var(--ok); color:#fff;}
+  .note{font-size:12px; color:var(--sub); line-height:1.7;}
+  .note ul{margin:4px 0 0 18px; padding:0;}
+  .note b{display:block; margin-top:8px; color:var(--txt);}
+  .note b:first-child{margin-top:0;}
+  .fitdesc{font-size:12px; color:var(--sub); margin-top:6px;}
+  svg text{font-family:"Segoe UI","Meiryo",sans-serif;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>キー溝公差ヘルパー(JIS B 1301 平行キー)</h1>
+  <div class="ver">Ver.1.1 2026-07-08 / JIS B 1301:1996 付表4準拠 単位: mm / コピーはAutoCAD寸法追記用書式(寸法値なし・^区切り)</div>
+
+  <div class="card">
+    <div class="row">
+      <div>
+        <label>軸径 d [mm](6〜500)</label>
+        <input type="number" id="dia" min="6" max="500" step="1" value="30" oninput="calc()">
+      </div>
+      <div>
+        <label>キーサイズ b×h(軸径から自動 / 手動選択可)</label>
+        <select id="ksel" onchange="calc(true)"></select>
+      </div>
+      <div>
+        <label>結合形式</label>
+        <div class="formsel">
+          <button id="f0" class="act" onclick="setForm(0)">普通形</button>
+          <button id="f1" onclick="setForm(1)">滑動形</button>
+          <button id="f2" onclick="setForm(2)">締込み形</button>
+        </div>
+      </div>
+    </div>
+    <div class="keyinfo" id="keyinfo"></div>
+    <div class="fitdesc" id="fitdesc"></div>
+    <div class="ngmsg" id="ngmsg"></div>
+  </div>
+
+  <div class="panes">
+    <div class="pane shaft">
+      <h2>軸公差(軸側キー溝)</h2>
+      <div class="body">
+        <div class="figbox">
+          <!-- 軸断面図 -->
+          <svg viewBox="0 0 260 230" width="260" height="230">
+            <!-- 軸外形 -->
+            <circle cx="120" cy="125" r="80" fill="#e3eefb" stroke="#0b62b8" stroke-width="2"/>
+            <!-- キー溝(上部スロット) 幅b1=44px 深さt1=26px -->
+            <path d="M 98 47.9 L 98 71 L 142 71 L 142 47.9 A 80 80 0 0 0 98 47.9 Z" fill="#f4f6f9" stroke="#0b62b8" stroke-width="2"/>
+            <!-- 中心線 -->
+            <line x1="120" y1="35" x2="120" y2="215" stroke="#9aa7b5" stroke-width="1" stroke-dasharray="8 3 2 3"/>
+            <line x1="30" y1="125" x2="210" y2="125" stroke="#9aa7b5" stroke-width="1" stroke-dasharray="8 3 2 3"/>
+            <!-- b1 寸法 -->
+            <line x1="98" y1="40" x2="98" y2="26" stroke="#1e2a38" stroke-width="1"/>
+            <line x1="142" y1="40" x2="142" y2="26" stroke="#1e2a38" stroke-width="1"/>
+            <line x1="98" y1="30" x2="142" y2="30" stroke="#1e2a38" stroke-width="1" marker-start="url(#arS)" marker-end="url(#aeS)"/>
+            <text x="120" y="22" font-size="13" text-anchor="middle" fill="#0b62b8" font-weight="bold">b1</text>
+            <!-- t1 寸法(溝底〜軸頂) -->
+            <line x1="142" y1="45" x2="196" y2="45" stroke="#1e2a38" stroke-width="1"/>
+            <line x1="142" y1="71" x2="196" y2="71" stroke="#1e2a38" stroke-width="1"/>
+            <line x1="190" y1="45" x2="190" y2="71" stroke="#1e2a38" stroke-width="1" marker-start="url(#arSv)" marker-end="url(#aeSv)"/>
+            <text x="199" y="62" font-size="13" fill="#0b62b8" font-weight="bold">t1</text>
+            <!-- d-t1 寸法(軸底〜溝底) -->
+            <line x1="120" y1="205" x2="52" y2="205" stroke="#1e2a38" stroke-width="1"/>
+            <line x1="98" y1="71" x2="52" y2="71" stroke="#1e2a38" stroke-width="1"/>
+            <line x1="58" y1="71" x2="58" y2="205" stroke="#1e2a38" stroke-width="1" marker-start="url(#arSv)" marker-end="url(#aeSv)"/>
+            <text x="52" y="142" font-size="13" text-anchor="end" fill="#0b62b8" font-weight="bold">d−t1</text>
+            <defs>
+              <marker id="arS" markerWidth="10" markerHeight="8" refX="1" refY="4" orient="auto"><path d="M10,1 L1,4 L10,7" fill="none" stroke="#1e2a38"/></marker>
+              <marker id="aeS" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto"><path d="M0,1 L9,4 L0,7" fill="none" stroke="#1e2a38"/></marker>
+              <marker id="arSv" markerWidth="10" markerHeight="8" refX="1" refY="4" orient="auto"><path d="M10,1 L1,4 L10,7" fill="none" stroke="#1e2a38"/></marker>
+              <marker id="aeSv" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto"><path d="M0,1 L9,4 L0,7" fill="none" stroke="#1e2a38"/></marker>
+            </defs>
+          </svg>
+        </div>
+        <table>
+          <tr><th>項目</th><th>寸法・許容差</th><th>AutoCAD貼付用</th><th></th></tr>
+          <tbody id="shaftBody"></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="pane hub">
+      <h2>穴公差(ハブ側キー溝)</h2>
+      <div class="body">
+        <div class="figbox">
+          <!-- ハブ断面図 -->
+          <svg viewBox="0 0 260 230" width="260" height="230">
+            <!-- ハブ外形(参考) -->
+            <rect x="18" y="23" width="204" height="204" rx="10" fill="#fdf1e5" stroke="#b8560b" stroke-width="2"/>
+            <!-- 穴(白) -->
+            <circle cx="120" cy="135" r="70" fill="#ffffff" stroke="#b8560b" stroke-width="2"/>
+            <!-- キー溝(穴上部の外向き切欠き) 幅b2=44px 深さt2=20px -->
+            <path d="M 98 68.6 L 98 45 L 142 45 L 142 68.6 A 70 70 0 0 0 98 68.6 Z" fill="#ffffff" stroke="#b8560b" stroke-width="2"/>
+            <line x1="98.5" y1="67" x2="141.5" y2="67" stroke="#ffffff" stroke-width="3"/>
+            <!-- 中心線 -->
+            <line x1="120" y1="33" x2="120" y2="217" stroke="#9aa7b5" stroke-width="1" stroke-dasharray="8 3 2 3"/>
+            <line x1="40" y1="135" x2="200" y2="135" stroke="#9aa7b5" stroke-width="1" stroke-dasharray="8 3 2 3"/>
+            <!-- b2 寸法 -->
+            <line x1="98" y1="42" x2="98" y2="28" stroke="#1e2a38" stroke-width="1"/>
+            <line x1="142" y1="42" x2="142" y2="28" stroke="#1e2a38" stroke-width="1"/>
+            <line x1="98" y1="32" x2="142" y2="32" stroke="#1e2a38" stroke-width="1" marker-start="url(#arH)" marker-end="url(#aeH)"/>
+            <text x="120" y="24" font-size="13" text-anchor="middle" fill="#b8560b" font-weight="bold">b2</text>
+            <!-- t2 寸法(穴頂〜溝底) -->
+            <line x1="142" y1="45" x2="196" y2="45" stroke="#1e2a38" stroke-width="1"/>
+            <line x1="146" y1="66" x2="196" y2="66" stroke="#1e2a38" stroke-width="1"/>
+            <line x1="190" y1="45" x2="190" y2="66" stroke="#1e2a38" stroke-width="1" marker-start="url(#arH)" marker-end="url(#aeH)"/>
+            <text x="199" y="60" font-size="13" fill="#b8560b" font-weight="bold">t2</text>
+            <!-- d+t2 寸法(穴底〜溝底) -->
+            <line x1="120" y1="205" x2="52" y2="205" stroke="#1e2a38" stroke-width="1"/>
+            <line x1="98" y1="45" x2="52" y2="45" stroke="#1e2a38" stroke-width="1"/>
+            <line x1="58" y1="45" x2="58" y2="205" stroke="#1e2a38" stroke-width="1" marker-start="url(#arH)" marker-end="url(#aeH)"/>
+            <text x="52" y="130" font-size="13" text-anchor="end" fill="#b8560b" font-weight="bold">d+t2</text>
+            <defs>
+              <marker id="arH" markerWidth="10" markerHeight="8" refX="1" refY="4" orient="auto"><path d="M10,1 L1,4 L10,7" fill="none" stroke="#1e2a38"/></marker>
+              <marker id="aeH" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto"><path d="M0,1 L9,4 L0,7" fill="none" stroke="#1e2a38"/></marker>
+            </defs>
+          </svg>
+        </div>
+        <table>
+          <tr><th>項目</th><th>寸法・許容差</th><th>AutoCAD貼付用</th><th></th></tr>
+          <tbody id="hubBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="card note">
+    <b>使い方(AutoCAD)</b>
+    <ul>
+      <li>コピーした文字列(例: <code>N9(0^-0.036)</code>)を寸法値の後ろに貼り付け → マルチテキスト編集で <code>0^-0.036</code> の部分を選択し「スタック」で上下段公差表示になります。寸法数値は含みません。</li>
+    </ul>
+    <b>注記</b>
+    <ul>
+      <li>キー溝幅の公差クラス: 滑動形 = 軸 H9 / 穴 D10、普通形 = 軸 N9 / 穴 Js9、締込み形 = 軸・穴とも P9(JIS B 1301:1996 付表4)。</li>
+      <li>溝深さの許容差 t1・t2: 2×2〜6×6 は +0.1/0、8×7〜32×18 は +0.2/0、36×20 以上は +0.3/0。</li>
+      <li>溝の隅R r1,r2 はキーサイズにより範囲が変わります。表示された範囲内で加工してください。</li>
+      <li>d−t1(軸側)・d+t2(穴側)は測定・図面記入用の換算値。d−t1 は t1 の許容差を符号反転(0/−)して適用。</li>
+      <li>対応国際規格に無い括弧付きサイズ(7×7, 15×10, 24×16, 35×22, 38×24, 42×26)は新設計非推奨のため収録していません。</li>
+      <li>適応軸径は一般用途の目安です。トルクに対しキーが十分な場合はより太い軸に使用可(その場合 t1・t2 の修正を推奨)。</li>
+      <li>参考: キー本体の許容差は 幅 b = h9、高さ h = h9(6×6以下)/ h11(8×7以上)。</li>
+    </ul>
+    <b>免責事項</b>
+    <ul>
+      <li>本ツールはJIS B 1301:1996を参考にしたキー溝公差確認用の補助ツールです。設計・製作・検査に使用する場合は、必ず最新の規格書、社内基準、図面指示、実機条件で最終確認してください。</li>
+      <li>本ツールの計算結果・表示内容の利用により生じたいかなる損害、トラブル、加工不良、設計不具合についても、作成者は責任を負いません。利用者の判断と責任で使用してください。</li>
+    </ul>
+  </div>
+</div>
+
+<script>
+"use strict";
+// JIS B 1301:1996 付表4 平行キー用キー溝
+// [b, h, dmin, dmax(以下), t1, t2, tTol, r範囲]
+const KEYS = [
+  [2,  2,   6,   8,  1.2,  1.0, 0.1, "0.08~0.16"],
+  [3,  3,   8,  10,  1.8,  1.4, 0.1, "0.08~0.16"],
+  [4,  4,  10,  12,  2.5,  1.8, 0.1, "0.08~0.16"],
+  [5,  5,  12,  17,  3.0,  2.3, 0.1, "0.16~0.25"],
+  [6,  6,  17,  22,  3.5,  2.8, 0.1, "0.16~0.25"],
+  [8,  7,  22,  30,  4.0,  3.3, 0.2, "0.16~0.25"],
+  [10, 8,  30,  38,  5.0,  3.3, 0.2, "0.25~0.40"],
+  [12, 8,  38,  44,  5.0,  3.3, 0.2, "0.25~0.40"],
+  [14, 9,  44,  50,  5.5,  3.8, 0.2, "0.25~0.40"],
+  [16,10,  50,  58,  6.0,  4.3, 0.2, "0.25~0.40"],
+  [18,11,  58,  65,  7.0,  4.4, 0.2, "0.25~0.40"],
+  [20,12,  65,  75,  7.5,  4.9, 0.2, "0.40~0.60"],
+  [22,14,  75,  85,  9.0,  5.4, 0.2, "0.40~0.60"],
+  [25,14,  85,  95,  9.0,  5.4, 0.2, "0.40~0.60"],
+  [28,16,  95, 110, 10.0,  6.4, 0.2, "0.40~0.60"],
+  [32,18, 110, 130, 11.0,  7.4, 0.2, "0.40~0.60"],
+  [36,20, 130, 150, 12.0,  8.4, 0.3, "0.70~1.00"],
+  [40,22, 150, 170, 13.0,  9.4, 0.3, "0.70~1.00"],
+  [45,25, 170, 200, 15.0, 10.4, 0.3, "0.70~1.00"],
+  [50,28, 200, 230, 17.0, 11.4, 0.3, "0.70~1.00"],
+  [56,32, 230, 260, 20.0, 12.4, 0.3, "1.20~1.60"],
+  [63,32, 260, 290, 20.0, 12.4, 0.3, "1.20~1.60"],
+  [70,36, 290, 330, 22.0, 14.4, 0.3, "1.20~1.60"],
+  [80,40, 330, 380, 25.0, 15.4, 0.3, "2.00~2.50"],
+  [90,45, 380, 440, 28.0, 17.4, 0.3, "2.00~2.50"],
+  [100,50,440, 500, 31.0, 19.5, 0.3, "2.00~2.50"]
+];
+// 溝幅bの許容差 [bMin(超), bMax(以下), H9hi, H9lo, D10hi, D10lo, N9hi, N9lo, Js9(±), P9hi, P9lo]
+const BTOL = [
+  [1,  3, 0.025,0, 0.060,0.020, -0.004,-0.029, 0.0125, -0.006,-0.031],
+  [3,  6, 0.030,0, 0.078,0.030,  0,   -0.030,  0.0150, -0.012,-0.042],
+  [6, 10, 0.036,0, 0.098,0.040,  0,   -0.036,  0.0180, -0.015,-0.051],
+  [10,18, 0.043,0, 0.120,0.050,  0,   -0.043,  0.0215, -0.018,-0.061],
+  [18,30, 0.052,0, 0.149,0.065,  0,   -0.052,  0.0260, -0.022,-0.074],
+  [30,50, 0.062,0, 0.180,0.080,  0,   -0.062,  0.0310, -0.026,-0.088],
+  [50,80, 0.074,0, 0.220,0.100,  0,   -0.074,  0.0370, -0.032,-0.106],
+  [80,120,0.087,0, 0.260,0.120,  0,   -0.087,  0.0435, -0.037,-0.124]
+];
+const FORMS = [
+  {name:"普通形", shaft:["N9",6,7], hub:["Js9",-1,-1], desc:"軸に固定されたキーにハブをはめ込む結合(選択はめあい)"},
+  {name:"滑動形", shaft:["H9",2,3], hub:["D10",4,5], desc:"軸とハブとが相対的に軸方向に滑動できる結合"},
+  {name:"締込み形", shaft:["P9",9,10], hub:["P9",9,10], desc:"キーにハブを締め込む、又は軸とハブの間にキーを打ち込む結合(選択はめあい)"}
+];
+let form = 0;
+
+// 偏差の文字列化: 0は"0"、正は+付き。AutoCADスタック用に桁を残す
+function fmt(v, digits){
+  if (digits === undefined) digits = 4;
+  if (v === 0) return "0";
+  let s = v.toFixed(digits);
+  s = s.replace(/0+$/,"").replace(/\.$/,"");
+  return v > 0 ? "+" + s : s;
+}
+function fmtDim(v){ return (Math.round(v*1000)/1000).toString(); }
+// AutoCADスタック書式: 上偏差^下偏差(寸法値なし)
+function acadTol(hi, lo){ return fmt(hi) + "^" + fmt(lo); }
+function fmtPm(v){ return "±" + fmt(Math.abs(v)).replace("+",""); }
+function widthTolAcad(dev){
+  if (dev.sym === "Js9") return dev.sym + "(" + fmtPm(dev.hi) + ")";
+  return dev.sym + "(" + acadTol(dev.hi, dev.lo) + ")";
+}
+
+function btolRow(b){
+  for (const r of BTOL) if (b > r[0] && b <= r[1]) return r;
+  return null;
+}
+function devs(b, spec){
+  const r = btolRow(b);
+  if (spec[1] === -1) return {sym:"Js9", hi:r[8], lo:-r[8]};
+  return {sym:spec[0], hi:r[spec[1]], lo:r[spec[2]]};
+}
+
+function setForm(f){ form = f; for(let i=0;i<3;i++) document.getElementById("f"+i).classList.toggle("act", i===f); calc(true); }
+
+function copyTxt(btn, txt){
+  const done = () => { btn.classList.add("done"); btn.textContent="済"; setTimeout(()=>{btn.classList.remove("done"); btn.textContent="コピー";},900); };
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(txt).then(done).catch(()=>fallbackCopy(txt, done));
+  } else fallbackCopy(txt, done);
+}
+function fallbackCopy(txt, done){
+  const ta = document.createElement("textarea");
+  ta.value = txt; document.body.appendChild(ta); ta.select();
+  try { document.execCommand("copy"); done(); } catch(e){ alert("コピーできませんでした: " + txt); }
+  document.body.removeChild(ta);
+}
+
+function tr(label, valTxt, acadStr){
+  const t = document.createElement("tr");
+  const td1 = document.createElement("td"); td1.textContent = label;
+  const td2 = document.createElement("td"); td2.className = "val"; td2.textContent = valTxt;
+  const td3 = document.createElement("td"); td3.className = "acad"; td3.textContent = acadStr;
+  const td4 = document.createElement("td");
+  const b = document.createElement("button"); b.className="cpy"; b.textContent="コピー";
+  b.onclick = () => copyTxt(b, acadStr); td4.appendChild(b);
+  t.append(td1,td2,td3,td4); return t;
+}
+
+function buildSelect(){
+  const sel = document.getElementById("ksel");
+  sel.innerHTML = "";
+  const opt0 = document.createElement("option");
+  opt0.value = "-1"; opt0.textContent = "自動(軸径から)";
+  sel.appendChild(opt0);
+  KEYS.forEach((k,i)=>{
+    const o = document.createElement("option");
+    o.value = i;
+    o.textContent = k[0]+"×"+k[1]+"  (軸径 "+k[2]+"〜"+k[3]+")";
+    sel.appendChild(o);
+  });
+}
+
+function calc(){
+  const d = parseFloat(document.getElementById("dia").value);
+  const sel = document.getElementById("ksel");
+  const ng = document.getElementById("ngmsg");
+  const info = document.getElementById("keyinfo");
+  const fd = document.getElementById("fitdesc");
+  const sb = document.getElementById("shaftBody");
+  const hb = document.getElementById("hubBody");
+  sb.innerHTML = ""; hb.innerHTML = ""; ng.style.display = "none"; info.textContent=""; fd.textContent="";
+
+  let ki = parseInt(sel.value);
+  let k = null;
+  if (ki >= 0){
+    k = KEYS[ki];
+  } else {
+    if (isNaN(d) || d <= 0){ ng.textContent = "軸径を入力してください。"; ng.style.display="block"; return; }
+    for (const kk of KEYS){ if (d > kk[2] && d <= kk[3]) { k = kk; break; } }
+    if (!k && d === KEYS[0][2]) k = KEYS[0]; // d=6
+    if (!k){ ng.textContent = "軸径 " + d + " mm は適用範囲外です(6〜500 mm)。"; ng.style.display="block"; return; }
+  }
+  const [b,h,dmin,dmax,t1,t2,tt,rr] = k;
+  const F = FORMS[form];
+  const sd = devs(b, F.shaft), hd = devs(b, F.hub);
+  const hasD = !isNaN(d) && d > 0;
+  const inRange = hasD && d >= dmin && d <= dmax;
+
+  info.innerHTML = "選定キー: <b>" + b + "×" + h + "</b> (適応軸径 " + dmin + "〜" + dmax + " mm / キー: b " + b + " h9, h " + h + (b<=6?" h9":" h11") + " / 溝の隅 r1,r2 = " + rr + ")";
+  fd.textContent = F.name + ": " + F.desc;
+  if (ki >= 0 && hasD && !inRange){
+    ng.textContent = "注意: 選択中のキー " + b + "×" + h + " は軸径 " + d + " mm の適応範囲(" + dmin + "〜" + dmax + ")外です。";
+    ng.style.display = "block";
+  }
+
+  // ---- 軸側 ----
+  sb.appendChild(tr("溝幅 b1 = " + b, b + " " + sd.sym + " (" + fmt(sd.hi) + "/" + fmt(sd.lo) + ")",
+                    widthTolAcad(sd)));
+  sb.appendChild(tr("溝深さ t1 = " + fmtDim(t1), fmtDim(t1) + " (+" + tt + "/0)",
+                    acadTol(tt, 0)));
+  sb.appendChild(tr("隅R r1,r2", rr, "R" + rr));
+  if (hasD){
+    const dt1 = d - t1;
+    sb.appendChild(tr("d−t1 = " + fmtDim(dt1), fmtDim(dt1) + " (0/−" + tt + ")",
+                      acadTol(0, -tt)));
+  }
+
+  // ---- 穴側 ----
+  hb.appendChild(tr("溝幅 b2 = " + b, b + " " + hd.sym + " (" + fmt(hd.hi) + "/" + fmt(hd.lo) + ")",
+                    widthTolAcad(hd)));
+  hb.appendChild(tr("溝深さ t2 = " + fmtDim(t2), fmtDim(t2) + " (+" + tt + "/0)",
+                    acadTol(tt, 0)));
+  hb.appendChild(tr("隅R r1,r2", rr, "R" + rr));
+  if (hasD){
+    const dt2 = d + t2;
+    hb.appendChild(tr("d+t2 = " + fmtDim(dt2), fmtDim(dt2) + " (+" + tt + "/0)",
+                      acadTol(tt, 0)));
+  }
+}
+
+buildSelect();
+calc();
+</script>
+</body>
+</html>
